@@ -547,6 +547,41 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
             )}
           </div>
 
+          {/* Epic Progress */}
+          {issue.issue_type === 'epic' && issueDetail?.dependencies && issueDetail.dependencies.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Epic Progress
+              </label>
+              {(() => {
+                const total = issueDetail.dependencies.length
+                const closed = issueDetail.dependencies.filter(d => d.status === 'closed').length
+                const percent = Math.round((closed / total) * 100)
+                return (
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-600 dark:text-gray-400">{closed} of {total} tasks completed</span>
+                      <span className={`font-medium ${
+                        percent === 100 ? 'text-green-600 dark:text-green-400' :
+                        percent > 50 ? 'text-blue-600 dark:text-blue-400' :
+                        'text-gray-600 dark:text-gray-400'
+                      }`}>{percent}%</span>
+                    </div>
+                    <div className="w-full h-3 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          percent === 100 ? 'bg-green-500' :
+                          percent > 50 ? 'bg-blue-500' : 'bg-indigo-500'
+                        }`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
           {/* Dependencies - What this issue depends on (blocked by) */}
           {issueDetail?.dependencies && issueDetail.dependencies.length > 0 && (
             <div>

@@ -547,6 +547,24 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
           <button
             onClick={() => {
               setStatusFilter('all')
+              setTypeFilter('epic')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+              setSearchText('')
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              typeFilter === 'epic'
+                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show epics with progress"
+          >
+            Epics
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter('all')
               setTypeFilter('all')
               setPriorityFilter('all')
               setAssigneeFilter('all')
