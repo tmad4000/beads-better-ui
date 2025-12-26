@@ -7,9 +7,11 @@ export interface Issue {
   issue_type?: string
   assignee?: string
   labels?: string[]
-  created_at?: number
-  updated_at?: number
-  closed_at?: number
+  created_at?: string  // ISO 8601 format
+  updated_at?: string  // ISO 8601 format
+  closed_at?: string   // ISO 8601 format
+  dependency_count?: number
+  dependent_count?: number
 }
 
 export interface IssueDetail extends Issue {

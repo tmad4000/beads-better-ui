@@ -33,29 +33,82 @@ const TYPE_ICONS: Record<string, string> = {
   chore: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
 }
 
-function formatDate(timestamp?: number): string {
-  if (!timestamp) return '-'
-  return new Date(timestamp).toLocaleDateString()
+// Smart date formatting: relative for recent, short for older
+function formatDate(dateInput?: string | number): { display: string; full: string } {
+  if (!dateInput) return { display: '-', full: '' }
+
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : new Date(dateInput)
+  if (isNaN(date.getTime())) return { display: '-', full: '' }
+
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  const full = date.toLocaleString()
+
+  // Less than 1 minute
+  if (diffMins < 1) return { display: 'just now', full }
+  // Less than 1 hour
+  if (diffMins < 60) return { display: `${diffMins}m ago`, full }
+  // Less than 24 hours
+  if (diffHours < 24) return { display: `${diffHours}h ago`, full }
+  // Less than 7 days
+  if (diffDays < 7) {
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    return { display: `${dayName} ${time}`, full }
+  }
+  // Same year
+  if (date.getFullYear() === now.getFullYear()) {
+    return {
+      display: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      full
+    }
+  }
+  // Different year
+  return {
+    display: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }),
+    full
+  }
 }
 
 export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
   const [sortField, setSortField] = useState<SortField>('priority')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [labelFilter, setLabelFilter] = useState<string>('')
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
+  const [labelMode, setLabelMode] = useState<'any' | 'all'>('any')
 
   // Get all unique labels
   const allLabels = Array.from(
     new Set(issues.flatMap(i => i.labels || []))
   ).sort()
 
+  // Toggle label selection
+  function toggleLabel(label: string) {
+    setSelectedLabels(prev =>
+      prev.includes(label)
+        ? prev.filter(l => l !== label)
+        : [...prev, label]
+    )
+  }
+
   // Filter issues
   let filtered = issues
   if (statusFilter !== 'all') {
     filtered = filtered.filter(i => i.status === statusFilter)
   }
-  if (labelFilter) {
-    filtered = filtered.filter(i => i.labels?.includes(labelFilter))
+  if (selectedLabels.length > 0) {
+    filtered = filtered.filter(i => {
+      const issueLabels = i.labels || []
+      if (labelMode === 'any') {
+        return selectedLabels.some(l => issueLabels.includes(l))
+      } else {
+        return selectedLabels.every(l => issueLabels.includes(l))
+      }
+    })
   }
 
   // Sort issues
@@ -69,16 +122,16 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
         bVal = b.priority ?? 2
         break
       case 'created_at':
-        aVal = a.created_at ?? 0
-        bVal = b.created_at ?? 0
+        aVal = a.created_at ?? ''
+        bVal = b.created_at ?? ''
         break
       case 'updated_at':
-        aVal = a.updated_at ?? 0
-        bVal = b.updated_at ?? 0
+        aVal = a.updated_at ?? ''
+        bVal = b.updated_at ?? ''
         break
       case 'closed_at':
-        aVal = a.closed_at ?? 0
-        bVal = b.closed_at ?? 0
+        aVal = a.closed_at ?? ''
+        bVal = b.closed_at ?? ''
         break
       case 'title':
         aVal = a.title?.toLowerCase() ?? ''
@@ -152,18 +205,39 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
         </div>
 
         {allLabels.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600 dark:text-gray-400">Label:</label>
-            <select
-              value={labelFilter}
-              onChange={(e) => setLabelFilter(e.target.value)}
-              className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
-            >
-              <option value="">All</option>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm text-gray-600 dark:text-gray-400">Labels:</label>
+            <div className="flex items-center gap-1 flex-wrap">
               {allLabels.map(label => (
-                <option key={label} value={label}>{label}</option>
+                <button
+                  key={label}
+                  onClick={() => toggleLabel(label)}
+                  className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${
+                    selectedLabels.includes(label)
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {label}
+                </button>
               ))}
-            </select>
+            </div>
+            {selectedLabels.length > 1 && (
+              <button
+                onClick={() => setLabelMode(m => m === 'any' ? 'all' : 'any')}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+              >
+                {labelMode === 'any' ? 'any' : 'all'}
+              </button>
+            )}
+            {selectedLabels.length > 0 && (
+              <button
+                onClick={() => setSelectedLabels([])}
+                className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                clear
+              </button>
+            )}
           </div>
         )}
 
@@ -238,10 +312,16 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                   </select>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                  {formatDate(issue.created_at)}
+                  {(() => {
+                    const { display, full } = formatDate(issue.created_at)
+                    return <span title={full}>{display}</span>
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                  {formatDate(issue.updated_at)}
+                  {(() => {
+                    const { display, full } = formatDate(issue.updated_at)
+                    return <span title={full}>{display}</span>
+                  })()}
                 </td>
               </tr>
             ))}
