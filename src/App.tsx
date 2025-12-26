@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { IssueList } from './components/IssueList'
+import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
 
 interface BeadsInfo {
@@ -72,6 +73,8 @@ function App() {
           <IssueList issues={issues} onUpdateStatus={send} />
         )}
       </main>
+
+      <ToastContainer />
     </div>
   )
 }

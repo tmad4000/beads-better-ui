@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Issue, MessageType } from '../types'
+import { showToast } from './Toast'
 
 interface IssueListProps {
   issues: Issue[]
@@ -298,8 +299,23 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
             {sorted.map((issue) => (
               <tr key={issue.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
-                  {issue.id.split('-').pop()}
+                <td className="px-4 py-3 text-sm font-mono">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      try {
+                        await navigator.clipboard.writeText(issue.id)
+                        showToast(`Copied ${issue.id}`, 'success')
+                      } catch {
+                        showToast('Failed to copy', 'error')
+                      }
+                    }}
+                    className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
+                    title={`Copy ${issue.id}`}
+                    aria-label={`Copy issue ID ${issue.id}`}
+                  >
+                    {issue.id.split('-').pop()}
+                  </button>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
