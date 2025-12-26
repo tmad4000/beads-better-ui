@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Issue, IssueDetail, Comment } from '../types'
+import type { Issue, IssueDetail, MessageType } from '../types'
 import { showToast } from './Toast'
 
 interface IssueDetailPanelProps {
   issue: Issue | null
   onClose: () => void
-  onUpdate: (type: string, payload: unknown) => Promise<unknown>
+  onUpdate: (type: MessageType, payload?: unknown) => Promise<unknown>
   onDelete: (id: string) => Promise<void>
 }
 
@@ -81,11 +81,10 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
 
   if (!issue) return null
 
-  // Merge basic issue with detailed info
-  const displayIssue = issueDetail || issue
   const comments = issueDetail?.comments || []
 
   async function handleStatusChange(status: string) {
+    if (!issue) return
     try {
       await onUpdate('update-status', { id: issue.id, status })
       showToast('Status updated', 'success')
@@ -95,6 +94,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handlePriorityChange(priority: number) {
+    if (!issue) return
     try {
       await onUpdate('update-priority', { id: issue.id, priority })
       showToast('Priority updated', 'success')
@@ -104,6 +104,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handleTypeChange(type: string) {
+    if (!issue) return
     try {
       await onUpdate('update-type', { id: issue.id, type })
       showToast('Type updated', 'success')
@@ -113,6 +114,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handleAddLabel() {
+    if (!issue) return
     if (!newLabel.trim()) return
     try {
       await onUpdate('label-add', { id: issue.id, label: newLabel.trim() })
@@ -124,6 +126,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handleRemoveLabel(label: string) {
+    if (!issue) return
     try {
       await onUpdate('label-remove', { id: issue.id, label })
       showToast('Label removed', 'success')
@@ -133,6 +136,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handleDelete() {
+    if (!issue) return
     setDeleting(true)
     try {
       await onDelete(issue.id)
@@ -147,6 +151,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function copyId() {
+    if (!issue) return
     try {
       await navigator.clipboard.writeText(issue.id)
       showToast(`Copied ${issue.id}`, 'success')
@@ -156,6 +161,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }
 
   async function handleAddComment() {
+    if (!issue) return
     if (!newComment.trim()) return
     setAddingComment(true)
     try {

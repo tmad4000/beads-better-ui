@@ -102,6 +102,26 @@ function App() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
 
+  // Detect system dark mode preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+    function updateDarkMode(e: MediaQueryListEvent | MediaQueryList) {
+      if (e.matches) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+
+    // Set initial value
+    updateDarkMode(mediaQuery)
+
+    // Listen for changes
+    mediaQuery.addEventListener('change', updateDarkMode)
+    return () => mediaQuery.removeEventListener('change', updateDarkMode)
+  }, [])
+
   // Keep selected issue in sync with live data
   useEffect(() => {
     if (selectedIssue) {
@@ -149,11 +169,11 @@ function App() {
   }, [])
 
   const handleCreateIssue = useCallback(async (data: NewIssueData) => {
-    await send('create-issue' as any, data)
+    await send('create-issue', data)
   }, [send])
 
   const handleDeleteIssue = useCallback(async (id: string) => {
-    await send('delete-issue' as any, { id })
+    await send('delete-issue', { id })
   }, [send])
 
   return (
