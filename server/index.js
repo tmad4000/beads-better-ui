@@ -108,6 +108,29 @@ wss.on('connection', (ws) => {
           break
         }
 
+        case 'create-issue': {
+          const { title, description, type, priority, labels } = payload || {}
+          if (!title) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing title' }
+            break
+          }
+          const args = ['create', title]
+          if (type) args.push('--type', type)
+          if (priority !== undefined) args.push('--priority', String(priority))
+          if (description) args.push('--description', description)
+          if (labels && labels.length > 0) args.push('--labels', labels.join(','))
+
+          const result = await runBd(args)
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'CREATE_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
         case 'label-add': {
           const { id: issueId, label } = payload || {}
           const result = await runBd(['label', 'add', issueId, label])

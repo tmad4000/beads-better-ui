@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { IssueList } from './components/IssueList'
+import { NewIssueDialog, type NewIssueData } from './components/NewIssueDialog'
 import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
 
@@ -36,6 +37,7 @@ function Spinner() {
 function App() {
   const { connected, loading, issues, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
+  const [showNewIssue, setShowNewIssue] = useState(false)
 
   useEffect(() => {
     // Extract project name from first issue ID prefix
@@ -49,6 +51,22 @@ function App() {
       document.title = `${prefix} - Beads Better UI`
     }
   }, [issues])
+
+  // Keyboard shortcut: Ctrl/Cmd+N for new issue
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        setShowNewIssue(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const handleCreateIssue = useCallback(async (data: NewIssueData) => {
+    await send('create-issue' as any, data)
+  }, [send])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
@@ -65,7 +83,14 @@ function App() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowNewIssue(true)}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+              title="New Issue (Ctrl+N)"
+            >
+              + New Issue
+            </button>
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                 connected
@@ -98,12 +123,24 @@ function App() {
           </div>
         ) : issues.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">No issues found</p>
+            <p className="text-gray-500 dark:text-gray-400 mb-4">No issues found</p>
+            <button
+              onClick={() => setShowNewIssue(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+            >
+              Create your first issue
+            </button>
           </div>
         ) : (
           <IssueList issues={issues} onUpdateStatus={send} />
         )}
       </main>
+
+      <NewIssueDialog
+        isOpen={showNewIssue}
+        onClose={() => setShowNewIssue(false)}
+        onSubmit={handleCreateIssue}
+      />
 
       <ToastContainer />
     </div>
