@@ -575,6 +575,25 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
           >
             All
           </button>
+          {/* Clear all filters button - shows when any filter is active */}
+          {(statusFilter !== 'all' || typeFilter !== 'all' || priorityFilter !== 'all' || assigneeFilter !== 'all' || selectedLabels.length > 0 || searchText) && (
+            <button
+              onClick={() => {
+                setStatusFilter('all')
+                setTypeFilter('all')
+                setPriorityFilter('all')
+                setAssigneeFilter('all')
+                setSelectedLabels([])
+                setSearchText('')
+                setSortField('priority')
+                setSortDirection('asc')
+              }}
+              className="px-2 py-1 text-xs font-medium rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60 transition-colors"
+              title="Clear all filters and search"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
@@ -975,6 +994,15 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                       >
                         {issue.title || 'Untitled'}
                       </span>
+                      {/* Epic indicator with child count */}
+                      {issue.issue_type === 'epic' && (issue.dependency_count ?? 0) > 0 && (
+                        <span
+                          className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300"
+                          title={`Epic with ${issue.dependency_count} tasks`}
+                        >
+                          {issue.dependency_count} tasks
+                        </span>
+                      )}
                       {issue.status !== 'closed' && isStale(issue.updated_at) && (
                         <span
                           className="flex-shrink-0 text-amber-500 dark:text-amber-400"
