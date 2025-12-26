@@ -7,6 +7,7 @@ interface IssueDetailPanelProps {
   onClose: () => void
   onUpdate: (type: MessageType, payload?: unknown) => Promise<unknown>
   onDelete: (id: string) => Promise<void>
+  onIssueSelect?: (issue: Issue) => void
 }
 
 const STATUS_OPTIONS = ['open', 'in_progress', 'blocked', 'closed', 'deferred']
@@ -75,7 +76,7 @@ function formatCommentDate(timestamp: number): string {
   return date.toLocaleDateString()
 }
 
-export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDetailPanelProps) {
+export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete, onIssueSelect }: IssueDetailPanelProps) {
   const [newLabel, setNewLabel] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -594,7 +595,8 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                 {issueDetail.dependencies.map(dep => (
                   <div
                     key={dep.id}
-                    className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800"
+                    onClick={() => onIssueSelect?.({ id: dep.id, title: dep.title, status: dep.status as Issue['status'], priority: dep.priority, issue_type: dep.issue_type })}
+                    className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
                   >
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                       dep.status === 'closed' ? 'bg-green-500' :
@@ -613,6 +615,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                     }`}>
                       {dep.status || 'open'}
                     </span>
+                    <span className="text-gray-400 dark:text-gray-500">→</span>
                   </div>
                 ))}
               </div>
@@ -629,7 +632,8 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                 {issueDetail.dependents.map(dep => (
                   <div
                     key={dep.id}
-                    className="flex items-center gap-2 p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-md border border-cyan-200 dark:border-cyan-800"
+                    onClick={() => onIssueSelect?.({ id: dep.id, title: dep.title, status: dep.status as Issue['status'], priority: dep.priority, issue_type: dep.issue_type })}
+                    className="flex items-center gap-2 p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-md border border-cyan-200 dark:border-cyan-800 cursor-pointer hover:bg-cyan-100 dark:hover:bg-cyan-900/40 transition-colors"
                   >
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                       dep.status === 'closed' ? 'bg-green-500' :
@@ -648,6 +652,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                     }`}>
                       {dep.status || 'open'}
                     </span>
+                    <span className="text-gray-400 dark:text-gray-500">→</span>
                   </div>
                 ))}
               </div>

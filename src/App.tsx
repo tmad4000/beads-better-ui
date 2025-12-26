@@ -296,6 +296,7 @@ function App() {
         onClose={() => setSelectedIssue(null)}
         onUpdate={send}
         onDelete={handleDeleteIssue}
+        onIssueSelect={setSelectedIssue}
       />
 
       {showShortcuts && (
