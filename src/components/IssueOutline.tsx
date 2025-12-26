@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Issue, IssueDetail, MessageType } from '../types'
 
 interface IssueOutlineProps {
@@ -6,6 +6,8 @@ interface IssueOutlineProps {
   onUpdate: (type: MessageType, payload?: unknown) => Promise<unknown>
   onIssueClick?: (issue: Issue) => void
 }
+
+type OutlineDirection = 'deps-above' | 'deps-below'
 
 const STATUS_DOT_COLORS: Record<string, string> = {
   open: 'bg-green-500',
@@ -56,9 +58,39 @@ function issueSuffix(id: string): string {
 }
 
 export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlineProps) {
+  const [direction, setDirection] = useState<OutlineDirection>('deps-below')
   const [detailById, setDetailById] = useState<Map<string, IssueDetail>>(() => new Map())
   const [loadingIds, setLoadingIds] = useState<Set<string>>(() => new Set())
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set())
+  const [collapsedByDirection, setCollapsedByDirection] = useState<Record<OutlineDirection, Set<string>>>(() => ({
+    'deps-above': new Set(),
+    'deps-below': new Set(),
+  }))
+  const scrollPositions = useRef<Record<OutlineDirection, number>>({
+    'deps-above': 0,
+    'deps-below': 0,
+  })
+  const activeDirection = useRef<OutlineDirection>(direction)
+
+  useEffect(() => {
+    activeDirection.current = direction
+  }, [direction])
+
+  useEffect(() => {
+    function handleScroll() {
+      scrollPositions.current[activeDirection.current] = window.scrollY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const target = scrollPositions.current[direction] ?? 0
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: target, behavior: 'auto' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [direction])
 
   const issuesById = useMemo(() => {
     const map = new Map<string, Issue>()
@@ -67,7 +99,7 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
   }, [issues])
 
   const issuesNeedingDetails = useMemo(() => {
-    return issues.filter(issue => (issue.dependency_count ?? 0) > 0)
+    return issues.filter(issue => (issue.dependency_count ?? 0) > 0 || (issue.dependent_count ?? 0) > 0)
   }, [issues])
 
   useEffect(() => {
@@ -125,21 +157,26 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
     }
   }, [detailById, issuesNeedingDetails, onUpdate])
 
+  function getRelationCount(issue: Issue, mode: OutlineDirection) {
+    return mode === 'deps-above' ? (issue.dependency_count ?? 0) : (issue.dependent_count ?? 0)
+  }
+
   const graph = useMemo(() => {
     const childrenByParent = new Map<string, string[]>()
     const roots: string[] = []
-    const meta = new Map<string, { extraDeps: string[]; missingDeps: string[]; unresolved: boolean }>()
+    const meta = new Map<string, { extraLinks: string[]; missingLinks: string[]; unresolved: boolean }>()
 
     issues.forEach(issue => {
       const detail = detailById.get(issue.id)
-      const depIds = (detail?.dependencies || []).map(dep => dep.id)
-      const inList = depIds.filter(id => issuesById.has(id))
-      const missing = depIds.filter(id => !issuesById.has(id))
-      const unresolved = !detail && (issue.dependency_count ?? 0) > 0
+      const relations = direction === 'deps-above' ? detail?.dependencies : detail?.dependents
+      const relationIds = (relations || []).map(dep => dep.id)
+      const inList = relationIds.filter(id => issuesById.has(id))
+      const missing = relationIds.filter(id => !issuesById.has(id))
+      const unresolved = !detail && getRelationCount(issue, direction) > 0
 
       meta.set(issue.id, {
-        extraDeps: inList.slice(1),
-        missingDeps: missing,
+        extraLinks: inList.slice(1),
+        missingLinks: missing,
         unresolved,
       })
 
@@ -160,7 +197,7 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
     }
 
     return { roots, childrenByParent, meta }
-  }, [detailById, issues, issuesById])
+  }, [detailById, direction, issues, issuesById])
 
   const expandableIds = useMemo(() => {
     const ids = new Set<string>()
@@ -170,25 +207,44 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
     return ids
   }, [graph.childrenByParent])
 
-  const pendingCount = loadingIds.size
-  const expectedCount = issuesNeedingDetails.length
-  const loadedCount = issuesNeedingDetails.filter(issue => detailById.has(issue.id)).length
+  const modeIssues = useMemo(() => {
+    return issues.filter(issue => getRelationCount(issue, direction) > 0)
+  }, [direction, issues])
+
+  const pendingCount = modeIssues.filter(issue => loadingIds.has(issue.id)).length
+  const expectedCount = modeIssues.length
+  const loadedCount = modeIssues.filter(issue => detailById.has(issue.id)).length
+
+  const collapsedIds = collapsedByDirection[direction] || new Set()
 
   function toggleCollapse(id: string) {
-    setCollapsedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+    setCollapsedByDirection(prev => {
+      const next = { ...prev }
+      const current = new Set(prev[direction] || [])
+      if (current.has(id)) current.delete(id)
+      else current.add(id)
+      next[direction] = current
       return next
     })
   }
 
   function collapseAll() {
-    setCollapsedIds(new Set(expandableIds))
+    setCollapsedByDirection(prev => ({
+      ...prev,
+      [direction]: new Set(expandableIds),
+    }))
   }
 
   function expandAll() {
-    setCollapsedIds(new Set())
+    setCollapsedByDirection(prev => ({
+      ...prev,
+      [direction]: new Set(),
+    }))
+  }
+
+  function switchDirection(next: OutlineDirection) {
+    scrollPositions.current[direction] = window.scrollY
+    setDirection(next)
   }
 
   function renderNode(id: string, depth: number, path: Set<string>) {
@@ -203,6 +259,7 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
     const type = issue.issue_type || 'task'
     const meta = graph.meta.get(id)
     const isCycle = path.has(id)
+    const relationLabel = direction === 'deps-above' ? 'dependencies' : 'dependents'
 
     const row = (
       <div
@@ -247,24 +304,24 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
             <span className={`w-2 h-2 rounded-full ${STATUS_DOT_COLORS[status] || 'bg-gray-400'}`} />
             {STATUS_LABELS[status] || status}
           </span>
-          {meta?.extraDeps && meta.extraDeps.length > 0 && (
+          {meta?.extraLinks && meta.extraLinks.length > 0 && (
             <span
               className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
-              title={`Also depends on ${meta.extraDeps.join(', ')}`}
+              title={`Also linked to ${meta.extraLinks.join(', ')} (${relationLabel})`}
             >
-              +{meta.extraDeps.length} deps
+              +{meta.extraLinks.length} more
             </span>
           )}
-          {meta?.missingDeps && meta.missingDeps.length > 0 && (
+          {meta?.missingLinks && meta.missingLinks.length > 0 && (
             <span
               className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-              title={`Missing dependencies: ${meta.missingDeps.join(', ')}`}
+              title={`Missing ${relationLabel}: ${meta.missingLinks.join(', ')}`}
             >
-              missing {meta.missingDeps.length}
+              missing {meta.missingLinks.length}
             </span>
           )}
           {meta?.unresolved && (
-            <span className="text-[10px] text-gray-400">loading deps...</span>
+            <span className="text-[10px] text-gray-400">loading links...</span>
           )}
           {isCycle && (
             <span className="text-[10px] text-red-500">cycle</span>
@@ -291,6 +348,30 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
+        <div className="inline-flex rounded-full border border-gray-200 dark:border-slate-600 overflow-hidden">
+          <button
+            onClick={() => switchDirection('deps-below')}
+            className={`px-3 py-1 text-xs font-medium transition-colors ${
+              direction === 'deps-below'
+                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+            }`}
+            title="Show dependencies below their issues"
+          >
+            Dependencies below
+          </button>
+          <button
+            onClick={() => switchDirection('deps-above')}
+            className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-200 dark:border-slate-600 ${
+              direction === 'deps-above'
+                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+            }`}
+            title="Show dependencies above the issues they block"
+          >
+            Dependencies above
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={expandAll}
@@ -313,7 +394,7 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
         </div>
         {expectedCount > 0 && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            deps {loadedCount}/{expectedCount}{pendingCount > 0 ? ` (${pendingCount} loading)` : ''}
+            links {loadedCount}/{expectedCount}{pendingCount > 0 ? ` (${pendingCount} loading)` : ''}
           </div>
         )}
       </div>
