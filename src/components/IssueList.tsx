@@ -10,27 +10,27 @@ type SortField = 'priority' | 'created_at' | 'updated_at' | 'closed_at' | 'title
 type SortDirection = 'asc' | 'desc'
 
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-green-100 text-green-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  blocked: 'bg-red-100 text-red-800',
-  closed: 'bg-purple-100 text-purple-800',
-  deferred: 'bg-gray-100 text-gray-800',
+  open: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+  in_progress: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+  blocked: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300',
+  closed: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+  deferred: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300',
 }
 
 const PRIORITY_COLORS: Record<number, string> = {
   0: 'bg-red-500 text-white',
   1: 'bg-orange-500 text-white',
-  2: 'bg-yellow-500 text-black',
+  2: 'bg-yellow-500 text-black dark:text-black',
   3: 'bg-blue-500 text-white',
-  4: 'bg-gray-400 text-white',
+  4: 'bg-gray-400 dark:bg-gray-600 text-white',
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  bug: 'bg-red-100 text-red-700',
-  feature: 'bg-green-100 text-green-700',
-  task: 'bg-yellow-100 text-yellow-700',
-  epic: 'bg-orange-100 text-orange-700',
-  chore: 'bg-gray-100 text-gray-700',
+  bug: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  feature: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+  task: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+  epic: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+  chore: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
 }
 
 function formatDate(timestamp?: number): string {
@@ -108,13 +108,13 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
     const isActive = sortField === field
     return (
       <th
-        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 select-none"
         onClick={() => handleSort(field)}
       >
         <div className="flex items-center gap-1">
           {children}
           {isActive && (
-            <span className="text-gray-400">
+            <span className="text-gray-400 dark:text-gray-500">
               {sortDirection === 'asc' ? '↑' : '↓'}
             </span>
           )}
@@ -132,15 +132,15 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
       {/* Filters */}
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center gap-4 flex-wrap">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Status:</label>
+          <label className="text-sm text-gray-600 dark:text-gray-400">Status:</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-sm border border-gray-300 rounded px-2 py-1"
+            className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
           >
             <option value="all">All</option>
             <option value="open">Open</option>
@@ -153,11 +153,11 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
 
         {allLabels.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Label:</label>
+            <label className="text-sm text-gray-600 dark:text-gray-400">Label:</label>
             <select
               value={labelFilter}
               onChange={(e) => setLabelFilter(e.target.value)}
-              className="text-sm border border-gray-300 rounded px-2 py-1"
+              className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
             >
               <option value="">All</option>
               {allLabels.map(label => (
@@ -167,25 +167,25 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
           </div>
         )}
 
-        <div className="ml-auto text-sm text-gray-500">
+        <div className="ml-auto text-sm text-gray-500 dark:text-gray-400">
           {sorted.length} of {issues.length} issues
         </div>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+          <thead className="bg-gray-50 dark:bg-slate-800/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
                 Type
               </th>
               <SortHeader field="priority">Priority</SortHeader>
               <SortHeader field="title">Title</SortHeader>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Labels
               </th>
               <SortHeader field="status">Status</SortHeader>
@@ -193,14 +193,14 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
               <SortHeader field="updated_at">Updated</SortHeader>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
             {sorted.map((issue) => (
-              <tr key={issue.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-mono text-gray-500">
+              <tr key={issue.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
                   {issue.id.split('-').pop()}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 text-gray-700'}`}>
+                  <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
                     {issue.issue_type || 'task'}
                   </span>
                 </td>
@@ -209,7 +209,7 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                     P{issue.priority ?? 2}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900 max-w-md truncate">
+                <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">
                   {issue.title || 'Untitled'}
                 </td>
                 <td className="px-4 py-3">
@@ -217,7 +217,7 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                     {(issue.labels || []).map(label => (
                       <span
                         key={label}
-                        className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-100 text-indigo-700"
+                        className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"
                       >
                         {label}
                       </span>
@@ -237,10 +237,10 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                     <option value="deferred">Deferred</option>
                   </select>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                   {formatDate(issue.created_at)}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                   {formatDate(issue.updated_at)}
                 </td>
               </tr>

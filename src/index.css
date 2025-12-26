@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Use system preference for dark mode */
+  --color-surface: #f9fafb;
+  --color-surface-dark: #0f172a;
+}
+
+/* System-adaptive dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply dark;
+  }
+}
+
 body {
   margin: 0;
   min-height: 100vh;
