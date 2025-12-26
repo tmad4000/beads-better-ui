@@ -35,6 +35,15 @@ const TYPE_ICONS: Record<string, string> = {
   chore: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
 }
 
+// Check if issue is stale (not updated in 14+ days)
+function isStale(dateInput?: string | number): boolean {
+  if (!dateInput) return false
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : new Date(dateInput)
+  if (isNaN(date.getTime())) return false
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000)
+  return diffDays >= 14
+}
+
 // Smart date formatting: relative for recent, short for older
 function formatDate(dateInput?: string | number): { display: string; full: string } {
   if (!dateInput) return { display: '-', full: '' }
@@ -748,16 +757,26 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                       autoFocus
                     />
                   ) : (
-                    <span
-                      className="truncate block cursor-text"
-                      onDoubleClick={(e) => {
-                        e.stopPropagation()
-                        startEditing(issue)
-                      }}
-                      title="Double-click to edit"
-                    >
-                      {issue.title || 'Untitled'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="truncate cursor-text"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          startEditing(issue)
+                        }}
+                        title="Double-click to edit"
+                      >
+                        {issue.title || 'Untitled'}
+                      </span>
+                      {issue.status !== 'closed' && isStale(issue.updated_at) && (
+                        <span
+                          className="flex-shrink-0 text-amber-500 dark:text-amber-400"
+                          title="Stale: not updated in 14+ days"
+                        >
+                          ⏰
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="px-4 py-3 hidden lg:table-cell">
