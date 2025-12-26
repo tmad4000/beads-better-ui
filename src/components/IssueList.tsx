@@ -79,14 +79,17 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
   const [sortField, setSortField] = useState<SortField>('priority')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all')
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [labelMode, setLabelMode] = useState<'any' | 'all'>('any')
   const [searchText, setSearchText] = useState<string>('')
 
-  // Get all unique labels
-  const allLabels = Array.from(
-    new Set(issues.flatMap(i => i.labels || []))
-  ).sort()
+  // Get all unique values for filters
+  const allLabels = Array.from(new Set(issues.flatMap(i => i.labels || []))).sort()
+  const allTypes = Array.from(new Set(issues.map(i => i.issue_type).filter(Boolean))).sort() as string[]
+  const allAssignees = Array.from(new Set(issues.map(i => i.assignee).filter(Boolean))).sort() as string[]
 
   // Toggle label selection
   function toggleLabel(label: string) {
@@ -101,6 +104,19 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
   let filtered = issues
   if (statusFilter !== 'all') {
     filtered = filtered.filter(i => i.status === statusFilter)
+  }
+  if (typeFilter !== 'all') {
+    filtered = filtered.filter(i => i.issue_type === typeFilter)
+  }
+  if (priorityFilter !== 'all') {
+    filtered = filtered.filter(i => String(i.priority ?? 2) === priorityFilter)
+  }
+  if (assigneeFilter !== 'all') {
+    if (assigneeFilter === 'unassigned') {
+      filtered = filtered.filter(i => !i.assignee)
+    } else {
+      filtered = filtered.filter(i => i.assignee === assigneeFilter)
+    }
   }
   if (selectedLabels.length > 0) {
     filtered = filtered.filter(i => {
@@ -232,6 +248,55 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
             <option value="deferred">Deferred</option>
           </select>
         </div>
+
+        {allTypes.length > 1 && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600 dark:text-gray-400">Type:</label>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+            >
+              <option value="all">All</option>
+              {allTypes.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600 dark:text-gray-400">Priority:</label>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+          >
+            <option value="all">All</option>
+            <option value="0">P0</option>
+            <option value="1">P1</option>
+            <option value="2">P2</option>
+            <option value="3">P3</option>
+            <option value="4">P4</option>
+          </select>
+        </div>
+
+        {allAssignees.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600 dark:text-gray-400">Assignee:</label>
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="text-sm border border-gray-300 dark:border-slate-600 rounded px-2 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+            >
+              <option value="all">All</option>
+              <option value="unassigned">Unassigned</option>
+              {allAssignees.map(a => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {allLabels.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
