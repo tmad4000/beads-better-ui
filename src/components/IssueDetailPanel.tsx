@@ -547,14 +547,72 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
             )}
           </div>
 
-          {/* Dependencies */}
-          {(issue.dependency_count !== undefined && issue.dependency_count > 0) && (
+          {/* Dependencies - What this issue depends on (blocked by) */}
+          {issueDetail?.dependencies && issueDetail.dependencies.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                Dependencies
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Blocked By ({issueDetail.dependencies.length})
               </label>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {issue.dependency_count} dependencies
+              <div className="space-y-2">
+                {issueDetail.dependencies.map(dep => (
+                  <div
+                    key={dep.id}
+                    className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800"
+                  >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      dep.status === 'closed' ? 'bg-green-500' :
+                      dep.status === 'blocked' ? 'bg-red-500' :
+                      dep.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400'
+                    }`} />
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                      {dep.id.split('-').pop()}
+                    </span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
+                      {dep.title || 'Untitled'}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      dep.status === 'closed' ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' :
+                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {dep.status || 'open'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dependents - What depends on this issue (blocking) */}
+          {issueDetail?.dependents && issueDetail.dependents.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                Blocking ({issueDetail.dependents.length})
+              </label>
+              <div className="space-y-2">
+                {issueDetail.dependents.map(dep => (
+                  <div
+                    key={dep.id}
+                    className="flex items-center gap-2 p-2 bg-cyan-50 dark:bg-cyan-900/20 rounded-md border border-cyan-200 dark:border-cyan-800"
+                  >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      dep.status === 'closed' ? 'bg-green-500' :
+                      dep.status === 'blocked' ? 'bg-red-500' :
+                      dep.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-400'
+                    }`} />
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                      {dep.id.split('-').pop()}
+                    </span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
+                      {dep.title || 'Untitled'}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      dep.status === 'closed' ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' :
+                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {dep.status || 'open'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

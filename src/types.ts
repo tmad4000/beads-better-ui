@@ -28,7 +28,10 @@ export interface IssueDetail extends Issue {
 export interface Dependency {
   id: string
   title?: string
+  status?: string
+  priority?: number
   issue_type?: string
+  dependency_type?: 'blocks' | 'relates_to'
 }
 
 export interface Comment {
