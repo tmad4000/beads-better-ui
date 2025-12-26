@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { IssueList } from './components/IssueList'
+import { KanbanBoard } from './components/KanbanBoard'
 import { IssueDetailPanel } from './components/IssueDetailPanel'
 import { NewIssueDialog, type NewIssueData } from './components/NewIssueDialog'
 import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
 import type { Issue } from './types'
+
+type ViewMode = 'list' | 'kanban'
 
 interface BeadsInfo {
   project: string
@@ -101,6 +104,7 @@ function App() {
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   // Detect system dark mode preference
   useEffect(() => {
@@ -192,6 +196,31 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="flex rounded-md border border-gray-300 dark:border-slate-600 overflow-hidden">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+                }`}
+                title="List view"
+              >
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600 ${
+                  viewMode === 'kanban'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+                }`}
+                title="Kanban board"
+              >
+                Kanban
+              </button>
+            </div>
             <button
               onClick={() => setShowShortcuts(true)}
               className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -249,8 +278,10 @@ function App() {
               Create your first issue
             </button>
           </div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
+        ) : (
+          <KanbanBoard issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
         )}
       </main>
 
