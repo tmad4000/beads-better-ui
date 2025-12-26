@@ -253,7 +253,8 @@ wss.on('connection', (ws) => {
             response.ok = false
             response.error = { code: 'SHOW_ERROR', message: result.error }
           } else {
-            response.payload = result.data
+            // bd show returns an array, extract the first item
+            response.payload = Array.isArray(result.data) ? result.data[0] : result.data
           }
           break
         }
@@ -273,7 +274,8 @@ wss.on('connection', (ws) => {
             // Return updated issue details
             const showResult = await runBdJson(['show', issueId, '--json'])
             if (showResult.ok) {
-              response.payload = showResult.data
+              // bd show returns an array, extract the first item
+              response.payload = Array.isArray(showResult.data) ? showResult.data[0] : showResult.data
             }
           }
           break
