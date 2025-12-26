@@ -371,6 +371,26 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
           </button>
           <button
             onClick={() => {
+              setStatusFilter('closed')
+              setSortField('closed_at')
+              setSortDirection('desc')
+              setTypeFilter('all')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+              setSearchText('')
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              statusFilter === 'closed'
+                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show recently closed issues"
+          >
+            Closed
+          </button>
+          <button
+            onClick={() => {
               setStatusFilter('all')
               setTypeFilter('all')
               setPriorityFilter('all')
@@ -541,6 +561,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               <SortHeader field="status">Status</SortHeader>
               <SortHeader field="created_at">Created</SortHeader>
               <SortHeader field="updated_at">Updated</SortHeader>
+              <SortHeader field="closed_at">Closed</SortHeader>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
@@ -674,6 +695,12 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                     const { display, full } = formatDate(issue.updated_at)
                     return <span title={full}>{display}</span>
                   })()}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  {issue.closed_at ? (() => {
+                    const { display, full } = formatDate(issue.closed_at)
+                    return <span title={full}>{display}</span>
+                  })() : <span className="text-gray-300 dark:text-gray-600">-</span>}
                 </td>
               </tr>
             ))}
