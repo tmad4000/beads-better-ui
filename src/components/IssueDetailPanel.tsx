@@ -25,6 +25,40 @@ function formatDate(dateInput?: string): string {
   return date.toLocaleString()
 }
 
+// Format estimate minutes to human-readable string
+function formatEstimate(minutes?: number): string {
+  if (!minutes || minutes <= 0) return '-'
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (hours === 0) return `${mins}m`
+  if (mins === 0) return `${hours}h`
+  return `${hours}h ${mins}m`
+}
+
+// Parse external ref to get link URL
+function getExternalRefLink(ref?: string): { url: string; label: string } | null {
+  if (!ref) return null
+  const lower = ref.toLowerCase()
+
+  // GitHub: gh-123, github-123, #123
+  if (lower.startsWith('gh-') || lower.startsWith('github-')) {
+    const num = ref.replace(/^(gh-|github-)/i, '')
+    return { url: `https://github.com/issues/${num}`, label: ref }
+  }
+
+  // Jira: PROJ-123
+  if (/^[A-Z]+-\d+$/.test(ref)) {
+    return { url: `#`, label: ref } // Jira URL would need project config
+  }
+
+  // URL: https://...
+  if (ref.startsWith('http://') || ref.startsWith('https://')) {
+    return { url: ref, label: ref }
+  }
+
+  return { url: '#', label: ref }
+}
+
 // Format comment timestamp
 function formatCommentDate(timestamp: number): string {
   const date = new Date(timestamp)
@@ -49,6 +83,10 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [addingComment, setAddingComment] = useState(false)
+  const [editingEstimate, setEditingEstimate] = useState(false)
+  const [estimateInput, setEstimateInput] = useState('')
+  const [editingRef, setEditingRef] = useState(false)
+  const [refInput, setRefInput] = useState('')
 
   // Fetch full issue details when issue changes
   const fetchIssueDetail = useCallback(async () => {
@@ -176,6 +214,44 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
     } finally {
       setAddingComment(false)
     }
+  }
+
+  async function handleEstimateSave() {
+    if (!issue) return
+    const input = estimateInput.trim()
+    let minutes = 0
+
+    if (input) {
+      // Parse various formats: "2h", "30m", "2h 30m", "90", "1.5h"
+      const hourMatch = input.match(/(\d+(?:\.\d+)?)\s*h/i)
+      const minMatch = input.match(/(\d+)\s*m/i)
+      const plainNum = input.match(/^(\d+)$/)
+
+      if (hourMatch) minutes += Math.round(parseFloat(hourMatch[1]) * 60)
+      if (minMatch) minutes += parseInt(minMatch[1])
+      if (plainNum && !hourMatch && !minMatch) minutes = parseInt(plainNum[1])
+    }
+
+    try {
+      await onUpdate('update-estimate', { id: issue.id, estimate: minutes })
+      showToast('Estimate updated', 'success')
+    } catch {
+      showToast('Failed to update estimate', 'error')
+    }
+    setEditingEstimate(false)
+    setEstimateInput('')
+  }
+
+  async function handleExternalRefSave() {
+    if (!issue) return
+    try {
+      await onUpdate('update-external-ref', { id: issue.id, externalRef: refInput.trim() })
+      showToast('External ref updated', 'success')
+    } catch {
+      showToast('Failed to update external ref', 'error')
+    }
+    setEditingRef(false)
+    setRefInput('')
   }
 
   return (
@@ -336,6 +412,139 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
             <div className="text-gray-700 dark:text-gray-300">
               {issue.assignee || <span className="text-gray-400">Unassigned</span>}
             </div>
+          </div>
+
+          {/* Estimate */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+              Estimate
+            </label>
+            {editingEstimate ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={estimateInput}
+                  onChange={(e) => setEstimateInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleEstimateSave()
+                    } else if (e.key === 'Escape') {
+                      setEditingEstimate(false)
+                      setEstimateInput('')
+                    }
+                  }}
+                  placeholder="e.g., 2h, 30m, 2h 30m"
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                  autoFocus
+                />
+                <button
+                  onClick={handleEstimateSave}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingEstimate(false)
+                    setEstimateInput('')
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-700 dark:text-gray-300">
+                  {formatEstimate(issue.estimated_minutes)}
+                </span>
+                <button
+                  onClick={() => {
+                    setEditingEstimate(true)
+                    setEstimateInput(issue.estimated_minutes ? formatEstimate(issue.estimated_minutes) : '')
+                  }}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* External Ref */}
+          <div>
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+              External Reference
+            </label>
+            {editingRef ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={refInput}
+                  onChange={(e) => setRefInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleExternalRefSave()
+                    } else if (e.key === 'Escape') {
+                      setEditingRef(false)
+                      setRefInput('')
+                    }
+                  }}
+                  placeholder="e.g., gh-123, PROJ-456, https://..."
+                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                  autoFocus
+                />
+                <button
+                  onClick={handleExternalRefSave}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingRef(false)
+                    setRefInput('')
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {issue.external_ref ? (
+                  (() => {
+                    const link = getExternalRefLink(issue.external_ref)
+                    if (link && link.url !== '#') {
+                      return (
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          {link.label}
+                        </a>
+                      )
+                    }
+                    return <span className="text-gray-700 dark:text-gray-300">{issue.external_ref}</span>
+                  })()
+                ) : (
+                  <span className="text-gray-400">None</span>
+                )}
+                <button
+                  onClick={() => {
+                    setEditingRef(true)
+                    setRefInput(issue.external_ref || '')
+                  }}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dependencies */}

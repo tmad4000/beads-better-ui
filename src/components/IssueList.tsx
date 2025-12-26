@@ -138,11 +138,75 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
       return new Set()
     }
   })
+  const [savedViews, setSavedViews] = useState<{ name: string; filters: string }[]>(() => {
+    try {
+      const saved = localStorage.getItem('beads-saved-views')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+  const [showSaveView, setShowSaveView] = useState(false)
+  const [newViewName, setNewViewName] = useState('')
 
   // Persist pinned issues to localStorage
   useEffect(() => {
     localStorage.setItem('beads-pinned-issues', JSON.stringify([...pinnedIds]))
   }, [pinnedIds])
+
+  // Persist saved views to localStorage
+  useEffect(() => {
+    localStorage.setItem('beads-saved-views', JSON.stringify(savedViews))
+  }, [savedViews])
+
+  // Get current filters as a serialized string
+  function getCurrentFilters(): string {
+    return JSON.stringify({
+      sortField,
+      sortDirection,
+      statusFilter,
+      typeFilter,
+      priorityFilter,
+      assigneeFilter,
+      selectedLabels,
+      labelMode,
+      searchText,
+    })
+  }
+
+  // Save current view
+  function saveCurrentView() {
+    if (!newViewName.trim()) return
+    const filters = getCurrentFilters()
+    setSavedViews(prev => [...prev.filter(v => v.name !== newViewName.trim()), { name: newViewName.trim(), filters }])
+    setNewViewName('')
+    setShowSaveView(false)
+    showToast(`Saved view "${newViewName.trim()}"`, 'success')
+  }
+
+  // Load a saved view
+  function loadView(filters: string) {
+    try {
+      const parsed = JSON.parse(filters)
+      if (parsed.sortField) setSortField(parsed.sortField)
+      if (parsed.sortDirection) setSortDirection(parsed.sortDirection)
+      if (parsed.statusFilter !== undefined) setStatusFilter(parsed.statusFilter)
+      if (parsed.typeFilter !== undefined) setTypeFilter(parsed.typeFilter)
+      if (parsed.priorityFilter !== undefined) setPriorityFilter(parsed.priorityFilter)
+      if (parsed.assigneeFilter !== undefined) setAssigneeFilter(parsed.assigneeFilter)
+      if (parsed.selectedLabels) setSelectedLabels(parsed.selectedLabels)
+      if (parsed.labelMode) setLabelMode(parsed.labelMode)
+      if (parsed.searchText !== undefined) setSearchText(parsed.searchText)
+    } catch {
+      showToast('Failed to load view', 'error')
+    }
+  }
+
+  // Delete a saved view
+  function deleteView(name: string) {
+    setSavedViews(prev => prev.filter(v => v.name !== name))
+    showToast(`Deleted view "${name}"`, 'success')
+  }
 
   function togglePin(id: string) {
     setPinnedIds(prev => {
@@ -498,6 +562,89 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
           >
             All
           </button>
+        </div>
+
+        <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+
+        {/* Saved Views */}
+        <div className="flex items-center gap-1">
+          {savedViews.length > 0 && (
+            <div className="relative group">
+              <button
+                className="px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              >
+                Views ({savedViews.length})
+              </button>
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-gray-200 dark:border-slate-700 py-1 min-w-[150px] z-10 hidden group-hover:block">
+                {savedViews.map(view => (
+                  <div
+                    key={view.name}
+                    className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-slate-700"
+                  >
+                    <button
+                      onClick={() => loadView(view.filters)}
+                      className="text-sm text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                    >
+                      {view.name}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteView(view.name)
+                      }}
+                      className="text-gray-400 hover:text-red-500 ml-2"
+                      title="Delete view"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {showSaveView ? (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveCurrentView()
+                  else if (e.key === 'Escape') {
+                    setShowSaveView(false)
+                    setNewViewName('')
+                  }
+                }}
+                placeholder="View name..."
+                className="px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 w-24"
+                autoFocus
+              />
+              <button
+                onClick={saveCurrentView}
+                disabled={!newViewName.trim()}
+                className="px-2 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowSaveView(false)
+                  setNewViewName('')
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSaveView(true)}
+              className="px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              title="Save current filters as a view"
+            >
+              + Save View
+            </button>
+          )}
         </div>
 
         <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />

@@ -142,6 +142,41 @@ wss.on('connection', (ws) => {
           break
         }
 
+        case 'update-estimate': {
+          const { id: issueId, estimate } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          // Use 0 to clear the estimate
+          const result = await runBd(['update', issueId, '--estimate', String(estimate || 0)])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'UPDATE_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
+        case 'update-external-ref': {
+          const { id: issueId, externalRef } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          const result = await runBd(['update', issueId, '--external-ref', externalRef || ''])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'UPDATE_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
         case 'create-issue': {
           const { title, description, type, priority, labels } = payload || {}
           if (!title) {

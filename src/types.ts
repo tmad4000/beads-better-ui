@@ -12,6 +12,8 @@ export interface Issue {
   closed_at?: string   // ISO 8601 format
   dependency_count?: number
   dependent_count?: number
+  estimated_minutes?: number  // Time estimate in minutes
+  external_ref?: string       // External reference (e.g., 'gh-123', 'jira-ABC')
 }
 
 export interface IssueDetail extends Issue {
@@ -42,6 +44,8 @@ export type MessageType =
   | 'update-priority'
   | 'update-title'
   | 'update-type'
+  | 'update-estimate'
+  | 'update-external-ref'
   | 'create-issue'
   | 'delete-issue'
   | 'label-add'
