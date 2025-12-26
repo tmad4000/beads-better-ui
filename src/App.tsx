@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { IssueList } from './components/IssueList'
+import { IssueOutline } from './components/IssueOutline'
 import { KanbanBoard } from './components/KanbanBoard'
 import { IssueDetailPanel } from './components/IssueDetailPanel'
 import { NewIssueDialog, type NewIssueData } from './components/NewIssueDialog'
@@ -7,7 +8,7 @@ import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
 import type { Issue } from './types'
 
-type ViewMode = 'list' | 'kanban'
+type ViewMode = 'list' | 'kanban' | 'outline'
 
 interface BeadsInfo {
   project: string
@@ -210,6 +211,17 @@ function App() {
                 List
               </button>
               <button
+                onClick={() => setViewMode('outline')}
+                className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600 ${
+                  viewMode === 'outline'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+                }`}
+                title="Outline view"
+              >
+                Outline
+              </button>
+              <button
                 onClick={() => setViewMode('kanban')}
                 className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-gray-300 dark:border-slate-600 ${
                   viewMode === 'kanban'
@@ -280,6 +292,8 @@ function App() {
           </div>
         ) : viewMode === 'list' ? (
           <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
+        ) : viewMode === 'outline' ? (
+          <IssueOutline issues={issues} onUpdate={send} onIssueClick={setSelectedIssue} />
         ) : (
           <KanbanBoard issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
         )}
