@@ -130,6 +130,31 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
   const [editingTitle, setEditingTitle] = useState<string>('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<'none' | 'closing' | 'deleting'>('none')
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('beads-pinned-issues')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+
+  // Persist pinned issues to localStorage
+  useEffect(() => {
+    localStorage.setItem('beads-pinned-issues', JSON.stringify([...pinnedIds]))
+  }, [pinnedIds])
+
+  function togglePin(id: string) {
+    setPinnedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
 
   // Sync state to URL
   useEffect(() => {
@@ -202,7 +227,12 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
   }
 
   // Sort issues (memoized reference for keyboard nav)
+  // Pinned issues always come first
   const sorted = [...filtered].sort((a, b) => {
+    const aPinned = pinnedIds.has(a.id) ? 0 : 1
+    const bPinned = pinnedIds.has(b.id) ? 0 : 1
+    if (aPinned !== bPinned) return aPinned - bPinned
+
     let aVal: string | number | undefined
     let bVal: string | number | undefined
 
@@ -709,22 +739,39 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                   />
                 </td>
                 <td className="px-4 py-3 text-sm font-mono">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      try {
-                        await navigator.clipboard.writeText(issue.id)
-                        showToast(`Copied ${issue.id}`, 'success')
-                      } catch {
-                        showToast('Failed to copy', 'error')
-                      }
-                    }}
-                    className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
-                    title={`Copy ${issue.id}`}
-                    aria-label={`Copy issue ID ${issue.id}`}
-                  >
-                    {issue.id.split('-').pop()}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        togglePin(issue.id)
+                      }}
+                      className={`transition-colors ${
+                        pinnedIds.has(issue.id)
+                          ? 'text-amber-500 hover:text-amber-600'
+                          : 'text-gray-300 dark:text-gray-600 hover:text-amber-500'
+                      }`}
+                      title={pinnedIds.has(issue.id) ? 'Unpin issue' : 'Pin issue'}
+                      aria-label={pinnedIds.has(issue.id) ? 'Unpin issue' : 'Pin issue'}
+                    >
+                      📌
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        try {
+                          await navigator.clipboard.writeText(issue.id)
+                          showToast(`Copied ${issue.id}`, 'success')
+                        } catch {
+                          showToast('Failed to copy', 'error')
+                        }
+                      }}
+                      className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
+                      title={`Copy ${issue.id}`}
+                      aria-label={`Copy issue ID ${issue.id}`}
+                    >
+                      {issue.id.split('-').pop()}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3 hidden sm:table-cell">
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
