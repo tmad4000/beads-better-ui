@@ -93,9 +93,10 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
     if (!issue) return
     setLoadingDetail(true)
     try {
-      const result = await onUpdate('show-issue', { id: issue.id }) as { payload?: IssueDetail }
-      if (result?.payload) {
-        setIssueDetail(result.payload as IssueDetail)
+      // send() resolves with the payload directly, not wrapped in { payload: ... }
+      const result = await onUpdate('show-issue', { id: issue.id }) as IssueDetail | null
+      if (result) {
+        setIssueDetail(result)
       }
     } catch {
       // Silently fail - we still have basic issue info
@@ -203,9 +204,10 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
     if (!newComment.trim()) return
     setAddingComment(true)
     try {
-      const result = await onUpdate('add-comment', { id: issue.id, content: newComment.trim() }) as { payload?: IssueDetail }
-      if (result?.payload) {
-        setIssueDetail(result.payload as IssueDetail)
+      // send() resolves with the payload directly
+      const result = await onUpdate('add-comment', { id: issue.id, content: newComment.trim() }) as IssueDetail | null
+      if (result) {
+        setIssueDetail(result)
       }
       setNewComment('')
       showToast('Comment added', 'success')
