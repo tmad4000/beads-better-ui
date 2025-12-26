@@ -189,6 +189,44 @@ wss.on('connection', (ws) => {
           break
         }
 
+        case 'show-issue': {
+          const { id: issueId } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          const result = await runBdJson(['show', issueId, '--json'])
+          if (!result.ok) {
+            response.ok = false
+            response.error = { code: 'SHOW_ERROR', message: result.error }
+          } else {
+            response.payload = result.data
+          }
+          break
+        }
+
+        case 'add-comment': {
+          const { id: issueId, content } = payload || {}
+          if (!issueId || !content) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or content' }
+            break
+          }
+          const result = await runBd(['comments', 'add', issueId, content])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'COMMENT_ERROR', message: result.stderr }
+          } else {
+            // Return updated issue details
+            const showResult = await runBdJson(['show', issueId, '--json'])
+            if (showResult.ok) {
+              response.payload = showResult.data
+            }
+          }
+          break
+        }
+
         default:
           response.ok = false
           response.error = { code: 'UNKNOWN_TYPE', message: `Unknown message type: ${type}` }

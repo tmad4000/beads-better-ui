@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import type { Issue } from '../types'
+import { useState, useEffect, useCallback } from 'react'
+import type { Issue, IssueDetail, Comment } from '../types'
 import { showToast } from './Toast'
 
 interface IssueDetailPanelProps {
@@ -25,10 +25,50 @@ function formatDate(dateInput?: string): string {
   return date.toLocaleString()
 }
 
+// Format comment timestamp
+function formatCommentDate(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
+
 export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDetailPanelProps) {
   const [newLabel, setNewLabel] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [issueDetail, setIssueDetail] = useState<IssueDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const [addingComment, setAddingComment] = useState(false)
+
+  // Fetch full issue details when issue changes
+  const fetchIssueDetail = useCallback(async () => {
+    if (!issue) return
+    setLoadingDetail(true)
+    try {
+      const result = await onUpdate('show-issue', { id: issue.id }) as { payload?: IssueDetail }
+      if (result?.payload) {
+        setIssueDetail(result.payload as IssueDetail)
+      }
+    } catch {
+      // Silently fail - we still have basic issue info
+    } finally {
+      setLoadingDetail(false)
+    }
+  }, [issue?.id, onUpdate])
+
+  useEffect(() => {
+    fetchIssueDetail()
+  }, [fetchIssueDetail])
 
   // Close on Escape key
   useEffect(() => {
@@ -40,6 +80,10 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
   }, [onClose])
 
   if (!issue) return null
+
+  // Merge basic issue with detailed info
+  const displayIssue = issueDetail || issue
+  const comments = issueDetail?.comments || []
 
   async function handleStatusChange(status: string) {
     try {
@@ -99,6 +143,23 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
       showToast(`Copied ${issue.id}`, 'success')
     } catch {
       showToast('Failed to copy', 'error')
+    }
+  }
+
+  async function handleAddComment() {
+    if (!newComment.trim()) return
+    setAddingComment(true)
+    try {
+      const result = await onUpdate('add-comment', { id: issue.id, content: newComment.trim() }) as { payload?: IssueDetail }
+      if (result?.payload) {
+        setIssueDetail(result.payload as IssueDetail)
+      }
+      setNewComment('')
+      showToast('Comment added', 'success')
+    } catch {
+      showToast('Failed to add comment', 'error')
+    } finally {
+      setAddingComment(false)
     }
   }
 
@@ -276,6 +337,69 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                 <div className="text-gray-700 dark:text-gray-300">{formatDate(issue.closed_at)}</div>
               </div>
             )}
+          </div>
+
+          {/* Comments */}
+          <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
+            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+              Comments {comments.length > 0 && `(${comments.length})`}
+            </label>
+
+            {loadingDetail && comments.length === 0 && (
+              <div className="text-sm text-gray-400 dark:text-gray-500 mb-3">Loading...</div>
+            )}
+
+            {comments.length > 0 && (
+              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                {comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="bg-gray-50 dark:bg-slate-900 rounded-md p-3"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {comment.author || 'Unknown'}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {formatCommentDate(comment.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                      {comment.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {comments.length === 0 && !loadingDetail && (
+              <div className="text-sm text-gray-400 dark:text-gray-500 mb-3">No comments yet</div>
+            )}
+
+            {/* Add comment */}
+            <div className="flex gap-2">
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a comment..."
+                rows={2}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleAddComment()
+                  }
+                }}
+              />
+              <button
+                onClick={handleAddComment}
+                disabled={!newComment.trim() || addingComment}
+                className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50 self-end"
+                title="Cmd/Ctrl+Enter to submit"
+              >
+                {addingComment ? '...' : 'Add'}
+              </button>
+            </div>
           </div>
 
           {/* Danger Zone */}
