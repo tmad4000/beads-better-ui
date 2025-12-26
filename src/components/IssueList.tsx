@@ -495,7 +495,6 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               setPriorityFilter('all')
               setAssigneeFilter('all')
               setSelectedLabels([])
-              setSearchText('')
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
               statusFilter === 'blocked' && typeFilter === 'all' && priorityFilter === 'all'
@@ -513,7 +512,6 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               setPriorityFilter('all')
               setAssigneeFilter('all')
               setSelectedLabels([])
-              setSearchText('')
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
               statusFilter === 'open' && typeFilter === 'all' && priorityFilter === 'all'
@@ -533,7 +531,6 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               setPriorityFilter('all')
               setAssigneeFilter('all')
               setSelectedLabels([])
-              setSearchText('')
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
               statusFilter === 'closed'
@@ -551,7 +548,6 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               setPriorityFilter('all')
               setAssigneeFilter('all')
               setSelectedLabels([])
-              setSearchText('')
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
               typeFilter === 'epic'
@@ -569,10 +565,9 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               setPriorityFilter('all')
               setAssigneeFilter('all')
               setSelectedLabels([])
-              setSearchText('')
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-              statusFilter === 'all' && typeFilter === 'all' && priorityFilter === 'all' && selectedLabels.length === 0 && !searchText
+              statusFilter === 'all' && typeFilter === 'all' && priorityFilter === 'all' && selectedLabels.length === 0
                 ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
