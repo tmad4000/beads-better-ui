@@ -103,6 +103,15 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
     }
   }
 
+  async function handleTypeChange(type: string) {
+    try {
+      await onUpdate('update-type', { id: issue.id, type })
+      showToast('Type updated', 'success')
+    } catch {
+      showToast('Failed to update type', 'error')
+    }
+  }
+
   async function handleAddLabel() {
     if (!newLabel.trim()) return
     try {
@@ -206,9 +215,9 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
             {issue.title || 'Untitled'}
           </h2>
 
-          {/* Status & Priority */}
-          <div className="flex gap-4">
-            <div className="flex-1">
+          {/* Status, Priority & Type */}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
               <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
                 Status
               </label>
@@ -222,7 +231,7 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
                 ))}
               </select>
             </div>
-            <div className="flex-1">
+            <div>
               <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
                 Priority
               </label>
@@ -233,6 +242,20 @@ export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete }: IssueDe
               >
                 {PRIORITY_OPTIONS.map(p => (
                   <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Type
+              </label>
+              <select
+                value={issue.issue_type || 'task'}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+              >
+                {TYPE_OPTIONS.map(t => (
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
             </div>

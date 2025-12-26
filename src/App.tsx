@@ -36,11 +36,71 @@ function Spinner() {
   )
 }
 
+function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  const shortcuts = [
+    { keys: ['⌘/Ctrl', 'N'], action: 'New issue' },
+    { keys: ['j', '↓'], action: 'Move down' },
+    { keys: ['k', '↑'], action: 'Move up' },
+    { keys: ['Enter'], action: 'Open issue' },
+    { keys: ['Esc'], action: 'Close/deselect' },
+    { keys: ['?'], action: 'Show shortcuts' },
+  ]
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Keyboard Shortcuts
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
+          >
+            ×
+          </button>
+        </div>
+        <div className="space-y-2">
+          {shortcuts.map((s, i) => (
+            <div key={i} className="flex items-center justify-between py-1">
+              <span className="text-sm text-gray-600 dark:text-gray-400">{s.action}</span>
+              <div className="flex items-center gap-1">
+                {s.keys.map((key, ki) => (
+                  <span key={ki}>
+                    <kbd className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-slate-600">
+                      {key}
+                    </kbd>
+                    {ki < s.keys.length - 1 && <span className="text-gray-400 mx-0.5">/</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const { connected, loading, issues, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   // Keep selected issue in sync with live data
   useEffect(() => {
@@ -68,12 +128,20 @@ function App() {
     }
   }, [issues])
 
-  // Keyboard shortcut: Ctrl/Cmd+N for new issue
+  // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Don't handle if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
         setShowNewIssue(true)
+      } else if (e.key === '?' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        setShowShortcuts(true)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -104,6 +172,16 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="Keyboard shortcuts (?)"
+              aria-label="Show keyboard shortcuts"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
             <button
               onClick={() => setShowNewIssue(true)}
               className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
@@ -168,6 +246,10 @@ function App() {
         onUpdate={send}
         onDelete={handleDeleteIssue}
       />
+
+      {showShortcuts && (
+        <KeyboardShortcutsHelp onClose={() => setShowShortcuts(false)} />
+      )}
 
       <ToastContainer />
     </div>

@@ -125,6 +125,23 @@ wss.on('connection', (ws) => {
           break
         }
 
+        case 'update-type': {
+          const { id: issueId, type } = payload || {}
+          if (!issueId || !type) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or type' }
+            break
+          }
+          const result = await runBd(['update', issueId, '--type', type])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'UPDATE_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
         case 'create-issue': {
           const { title, description, type, priority, labels } = payload || {}
           if (!title) {
