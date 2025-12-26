@@ -108,6 +108,23 @@ wss.on('connection', (ws) => {
           break
         }
 
+        case 'update-title': {
+          const { id: issueId, title } = payload || {}
+          if (!issueId || !title) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or title' }
+            break
+          }
+          const result = await runBd(['update', issueId, '--title', title])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'UPDATE_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
         case 'create-issue': {
           const { title, description, type, priority, labels } = payload || {}
           if (!title) {
@@ -137,6 +154,23 @@ wss.on('connection', (ws) => {
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'LABEL_ERROR', message: result.stderr }
+          } else {
+            broadcastRefresh()
+          }
+          break
+        }
+
+        case 'delete-issue': {
+          const { id: issueId } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          const result = await runBd(['delete', issueId, '--force'])
+          if (result.code !== 0) {
+            response.ok = false
+            response.error = { code: 'DELETE_ERROR', message: result.stderr }
           } else {
             broadcastRefresh()
           }

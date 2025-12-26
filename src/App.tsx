@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { IssueList } from './components/IssueList'
+import { IssueDetailPanel } from './components/IssueDetailPanel'
 import { NewIssueDialog, type NewIssueData } from './components/NewIssueDialog'
 import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
+import type { Issue } from './types'
 
 interface BeadsInfo {
   project: string
@@ -38,6 +40,20 @@ function App() {
   const { connected, loading, issues, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
+
+  // Keep selected issue in sync with live data
+  useEffect(() => {
+    if (selectedIssue) {
+      const updated = issues.find(i => i.id === selectedIssue.id)
+      if (updated) {
+        setSelectedIssue(updated)
+      } else {
+        // Issue was deleted
+        setSelectedIssue(null)
+      }
+    }
+  }, [issues, selectedIssue?.id])
 
   useEffect(() => {
     // Extract project name from first issue ID prefix
@@ -66,6 +82,10 @@ function App() {
 
   const handleCreateIssue = useCallback(async (data: NewIssueData) => {
     await send('create-issue' as any, data)
+  }, [send])
+
+  const handleDeleteIssue = useCallback(async (id: string) => {
+    await send('delete-issue' as any, { id })
   }, [send])
 
   return (
@@ -132,7 +152,7 @@ function App() {
             </button>
           </div>
         ) : (
-          <IssueList issues={issues} onUpdateStatus={send} />
+          <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
         )}
       </main>
 
@@ -140,6 +160,13 @@ function App() {
         isOpen={showNewIssue}
         onClose={() => setShowNewIssue(false)}
         onSubmit={handleCreateIssue}
+      />
+
+      <IssueDetailPanel
+        issue={selectedIssue}
+        onClose={() => setSelectedIssue(null)}
+        onUpdate={send}
+        onDelete={handleDeleteIssue}
       />
 
       <ToastContainer />

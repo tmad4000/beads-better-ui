@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Issue, MessageType } from '../types'
 import { showToast } from './Toast'
 
 interface IssueListProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
+  onIssueClick?: (issue: Issue) => void
 }
 
 type SortField = 'priority' | 'created_at' | 'updated_at' | 'closed_at' | 'title' | 'status'
@@ -75,16 +76,68 @@ function formatDate(dateInput?: string | number): { display: string; full: strin
   }
 }
 
-export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
-  const [sortField, setSortField] = useState<SortField>('priority')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('all')
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([])
-  const [labelMode, setLabelMode] = useState<'any' | 'all'>('any')
-  const [searchText, setSearchText] = useState<string>('')
+// Get human-readable sort direction hint
+function getSortHint(field: SortField, direction: SortDirection): string {
+  const hints: Record<SortField, { asc: string; desc: string }> = {
+    priority: { asc: 'highest priority on top', desc: 'lowest priority on top' },
+    created_at: { asc: 'oldest on top', desc: 'newest on top' },
+    updated_at: { asc: 'oldest updates on top', desc: 'newest updates on top' },
+    closed_at: { asc: 'oldest closed on top', desc: 'newest closed on top' },
+    title: { asc: 'A-Z', desc: 'Z-A' },
+    status: { asc: 'A-Z', desc: 'Z-A' },
+  }
+  return hints[field][direction]
+}
+
+// Parse initial state from URL
+function getInitialStateFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  return {
+    sortField: (params.get('sort') as SortField) || 'priority',
+    sortDirection: (params.get('dir') as SortDirection) || 'asc',
+    statusFilter: params.get('status') || 'all',
+    typeFilter: params.get('type') || 'all',
+    priorityFilter: params.get('priority') || 'all',
+    assigneeFilter: params.get('assignee') || 'all',
+    selectedLabels: params.get('labels')?.split(',').filter(Boolean) || [],
+    labelMode: (params.get('labelMode') as 'any' | 'all') || 'any',
+    searchText: params.get('q') || '',
+  }
+}
+
+export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListProps) {
+  const initial = getInitialStateFromUrl()
+  const [sortField, setSortField] = useState<SortField>(initial.sortField)
+  const [sortDirection, setSortDirection] = useState<SortDirection>(initial.sortDirection)
+  const [statusFilter, setStatusFilter] = useState<string>(initial.statusFilter)
+  const [typeFilter, setTypeFilter] = useState<string>(initial.typeFilter)
+  const [priorityFilter, setPriorityFilter] = useState<string>(initial.priorityFilter)
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(initial.assigneeFilter)
+  const [selectedLabels, setSelectedLabels] = useState<string[]>(initial.selectedLabels)
+  const [labelMode, setLabelMode] = useState<'any' | 'all'>(initial.labelMode)
+  const [searchText, setSearchText] = useState<string>(initial.searchText)
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState<string>('')
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (sortField !== 'priority') params.set('sort', sortField)
+    if (sortDirection !== 'asc') params.set('dir', sortDirection)
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (typeFilter !== 'all') params.set('type', typeFilter)
+    if (priorityFilter !== 'all') params.set('priority', priorityFilter)
+    if (assigneeFilter !== 'all') params.set('assignee', assigneeFilter)
+    if (selectedLabels.length > 0) params.set('labels', selectedLabels.join(','))
+    if (labelMode !== 'any') params.set('labelMode', labelMode)
+    if (searchText) params.set('q', searchText)
+
+    const newUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname
+    window.history.replaceState({}, '', newUrl)
+  }, [sortField, sortDirection, statusFilter, typeFilter, priorityFilter, assigneeFilter, selectedLabels, labelMode, searchText])
 
   // Get all unique values for filters
   const allLabels = Array.from(new Set(issues.flatMap(i => i.labels || []))).sort()
@@ -137,7 +190,7 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
     )
   }
 
-  // Sort issues
+  // Sort issues (memoized reference for keyboard nav)
   const sorted = [...filtered].sort((a, b) => {
     let aVal: string | number | undefined
     let bVal: string | number | undefined
@@ -174,6 +227,37 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
     return 0
   })
 
+  // Keyboard navigation: j/k to move, Enter to open
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Don't handle if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) {
+      return
+    }
+
+    if (e.key === 'j' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      setFocusedIndex(prev => Math.min(prev + 1, sorted.length - 1))
+    } else if (e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      setFocusedIndex(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Enter' && focusedIndex >= 0 && focusedIndex < sorted.length) {
+      e.preventDefault()
+      onIssueClick?.(sorted[focusedIndex])
+    } else if (e.key === 'Escape') {
+      setFocusedIndex(-1)
+    }
+  }, [sorted, focusedIndex, onIssueClick])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  // Reset focus when filtered list changes
+  useEffect(() => {
+    setFocusedIndex(-1)
+  }, [statusFilter, typeFilter, priorityFilter, assigneeFilter, selectedLabels, searchText])
+
   function handleSort(field: SortField) {
     if (sortField === field) {
       setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
@@ -185,15 +269,26 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
 
   function SortHeader({ field, children }: { field: SortField; children: React.ReactNode }) {
     const isActive = sortField === field
+    const hint = isActive ? getSortHint(field, sortDirection) : `Click to sort`
     return (
       <th
         className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 select-none"
         onClick={() => handleSort(field)}
+        title={hint}
+        role="columnheader"
+        aria-sort={isActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleSort(field)
+          }
+        }}
       >
         <div className="flex items-center gap-1">
           {children}
           {isActive && (
-            <span className="text-gray-400 dark:text-gray-500">
+            <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">
               {sortDirection === 'asc' ? '↑' : '↓'}
             </span>
           )}
@@ -210,10 +305,92 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
     }
   }
 
+  async function handleTitleSave(id: string) {
+    const newTitle = editingTitle.trim()
+    if (!newTitle) {
+      setEditingId(null)
+      setEditingTitle('')
+      return
+    }
+    try {
+      await onUpdateStatus('update-title' as any, { id, title: newTitle })
+      showToast('Title updated', 'success')
+    } catch (err) {
+      showToast('Failed to update title', 'error')
+    }
+    setEditingId(null)
+    setEditingTitle('')
+  }
+
+  function startEditing(issue: Issue) {
+    setEditingId(issue.id)
+    setEditingTitle(issue.title || '')
+  }
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
       {/* Filters */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 flex items-center gap-4 flex-wrap">
+        {/* Quick views */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => {
+              setStatusFilter('blocked')
+              setTypeFilter('all')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+              setSearchText('')
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              statusFilter === 'blocked' && typeFilter === 'all' && priorityFilter === 'all'
+                ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show blocked issues"
+          >
+            Blocked
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter('open')
+              setTypeFilter('all')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+              setSearchText('')
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              statusFilter === 'open' && typeFilter === 'all' && priorityFilter === 'all'
+                ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show ready-to-work issues (open, no blockers)"
+          >
+            Ready
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter('all')
+              setTypeFilter('all')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+              setSearchText('')
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              statusFilter === 'all' && typeFilter === 'all' && priorityFilter === 'all' && selectedLabels.length === 0 && !searchText
+                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show all issues"
+          >
+            All
+          </button>
+        </div>
+
+        <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+
         {/* Search */}
         <div className="flex items-center gap-2">
           <input
@@ -222,11 +399,13 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="text-sm border border-gray-300 dark:border-slate-600 rounded px-3 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            aria-label="Search issues"
           />
           {searchText && (
             <button
               onClick={() => setSearchText('')}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              aria-label="Clear search"
             >
               ✕
             </button>
@@ -342,7 +521,7 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700" role="grid" aria-label="Issues list">
           <thead className="bg-gray-50 dark:bg-slate-800/50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
@@ -356,14 +535,23 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Labels
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16" title="Dependencies">
+                Deps
+              </th>
               <SortHeader field="status">Status</SortHeader>
               <SortHeader field="created_at">Created</SortHeader>
               <SortHeader field="updated_at">Updated</SortHeader>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-            {sorted.map((issue) => (
-              <tr key={issue.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+            {sorted.map((issue, index) => (
+              <tr
+                key={issue.id}
+                className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
+                  focusedIndex === index ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-inset ring-indigo-500' : ''
+                }`}
+                onClick={() => onIssueClick?.(issue)}
+              >
                 <td className="px-4 py-3 text-sm font-mono">
                   <button
                     onClick={async (e) => {
@@ -392,8 +580,38 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                     P{issue.priority ?? 2}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-md truncate">
-                  {issue.title || 'Untitled'}
+                <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 max-w-md">
+                  {editingId === issue.id ? (
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={() => handleTitleSave(issue.id)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter') {
+                          handleTitleSave(issue.id)
+                        } else if (e.key === 'Escape') {
+                          setEditingId(null)
+                          setEditingTitle('')
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-2 py-1 text-sm border border-indigo-500 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="truncate block cursor-text"
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        startEditing(issue)
+                      }}
+                      title="Double-click to edit"
+                    >
+                      {issue.title || 'Untitled'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
@@ -408,9 +626,34 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
                   </div>
                 </td>
                 <td className="px-4 py-3">
+                  {(issue.dependency_count ?? 0) > 0 || (issue.dependent_count ?? 0) > 0 ? (
+                    <div className="flex items-center gap-1 text-xs">
+                      {(issue.dependency_count ?? 0) > 0 && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                          title={`${issue.dependency_count} dependencies (blocked by)`}
+                        >
+                          ←{issue.dependency_count}
+                        </span>
+                      )}
+                      {(issue.dependent_count ?? 0) > 0 && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300"
+                          title={`${issue.dependent_count} dependents (blocking)`}
+                        >
+                          →{issue.dependent_count}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
                   <select
                     value={issue.status || 'open'}
                     onChange={(e) => handleStatusChange(issue.id, e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
                     className={`text-xs font-medium rounded px-2 py-1 border-0 cursor-pointer ${STATUS_COLORS[issue.status || 'open']}`}
                   >
                     <option value="open">Open</option>
