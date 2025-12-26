@@ -267,46 +267,49 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
         className="group"
         style={{ paddingLeft: depth * 20 }}
       >
-        <div className="flex items-start gap-2 py-1">
+        <div className="flex flex-wrap items-start gap-x-2 gap-y-1 py-1">
           {hasChildren ? (
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 toggleCollapse(id)
               }}
-              className="mt-0.5 w-4 h-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              className="mt-0.5 w-4 h-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex-shrink-0"
               aria-label={isCollapsed ? `Expand ${issue.title || issue.id}` : `Collapse ${issue.title || issue.id}`}
             >
               {isCollapsed ? '▸' : '▾'}
             </button>
           ) : (
-            <span className="mt-0.5 w-4 h-4" />
+            <span className="mt-0.5 w-4 h-4 flex-shrink-0" />
           )}
-          <span className="mt-0.5 text-gray-400">•</span>
+          <span className="mt-0.5 text-gray-400 flex-shrink-0">•</span>
           <button
             onClick={() => onIssueClick?.(issue)}
-            className="flex-1 text-left"
+            className="flex-1 text-left min-w-0"
           >
-            <div className="flex items-center gap-2">
-              <span className={`text-sm ${issue.status === 'closed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className={`text-sm truncate ${issue.status === 'closed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-gray-100'}`}
+                title={issue.title || 'Untitled'}
+              >
                 {issue.title || 'Untitled'}
               </span>
               <span className="text-xs text-gray-400 font-mono">{issueSuffix(issue.id)}</span>
             </div>
           </button>
-          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded ${TYPE_BADGES[type] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+          <span className={`inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0 ${TYPE_BADGES[type] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
             {type}
           </span>
-          <span className={`inline-flex w-7 h-6 items-center justify-center text-[11px] font-bold rounded ${PRIORITY_COLORS[priority]}`}>
+          <span className={`inline-flex w-7 h-6 items-center justify-center text-[11px] font-bold rounded flex-shrink-0 ${PRIORITY_COLORS[priority]}`}>
             P{priority}
           </span>
-          <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
+          <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 flex-shrink-0">
             <span className={`w-2 h-2 rounded-full ${STATUS_DOT_COLORS[status] || 'bg-gray-400'}`} />
             {STATUS_LABELS[status] || status}
           </span>
           {meta?.extraLinks && meta.extraLinks.length > 0 && (
             <span
-              className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+              className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
               title={`Also linked to ${meta.extraLinks.join(', ')} (${relationLabel})`}
             >
               +{meta.extraLinks.length} more
@@ -314,17 +317,17 @@ export function IssueOutline({ issues, onUpdate, onIssueClick }: IssueOutlinePro
           )}
           {meta?.missingLinks && meta.missingLinks.length > 0 && (
             <span
-              className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
               title={`Missing ${relationLabel}: ${meta.missingLinks.join(', ')}`}
             >
               missing {meta.missingLinks.length}
             </span>
           )}
           {meta?.unresolved && (
-            <span className="text-[10px] text-gray-400">loading links...</span>
+            <span className="text-[10px] text-gray-400 flex-shrink-0">loading links...</span>
           )}
           {isCycle && (
-            <span className="text-[10px] text-red-500">cycle</span>
+            <span className="text-[10px] text-red-500 flex-shrink-0">cycle</span>
           )}
         </div>
       </div>

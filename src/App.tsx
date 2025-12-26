@@ -303,6 +303,7 @@ function App() {
         isOpen={showNewIssue}
         onClose={() => setShowNewIssue(false)}
         onSubmit={handleCreateIssue}
+        issues={issues}
       />
 
       <IssueDetailPanel

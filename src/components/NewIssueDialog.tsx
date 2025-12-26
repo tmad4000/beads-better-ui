@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { showToast } from './Toast'
+import type { Issue } from '../types'
 
 interface NewIssueDialogProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (issue: NewIssueData) => Promise<void>
+  issues: Issue[]
 }
 
 export interface NewIssueData {
@@ -13,17 +15,31 @@ export interface NewIssueData {
   type: string
   priority: number
   labels: string[]
+  parentId?: string
 }
 
 const ISSUE_TYPES = ['task', 'feature', 'bug', 'epic', 'chore']
 
-export function NewIssueDialog({ isOpen, onClose, onSubmit }: NewIssueDialogProps) {
+export function NewIssueDialog({ isOpen, onClose, onSubmit, issues }: NewIssueDialogProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState('task')
   const [priority, setPriority] = useState(2)
   const [labelsInput, setLabelsInput] = useState('')
+  const [parentId, setParentId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const parentOptions = useMemo(() => {
+    return [...issues]
+      .sort((a, b) => {
+        const rankA = a.issue_type === 'epic' ? 0 : 1
+        const rankB = b.issue_type === 'epic' ? 0 : 1
+        if (rankA !== rankB) return rankA - rankB
+        const titleA = (a.title || a.id).toLowerCase()
+        const titleB = (b.title || b.id).toLowerCase()
+        return titleA.localeCompare(titleB)
+      })
+  }, [issues])
 
   if (!isOpen) return null
 
@@ -47,6 +63,7 @@ export function NewIssueDialog({ isOpen, onClose, onSubmit }: NewIssueDialogProp
         type,
         priority,
         labels,
+        parentId: parentId || undefined,
       })
 
       // Reset form
@@ -55,9 +72,10 @@ export function NewIssueDialog({ isOpen, onClose, onSubmit }: NewIssueDialogProp
       setType('task')
       setPriority(2)
       setLabelsInput('')
+      setParentId('')
       onClose()
       showToast('Issue created', 'success')
-    } catch (err) {
+    } catch {
       showToast('Failed to create issue', 'error')
     } finally {
       setSubmitting(false)
@@ -160,6 +178,24 @@ export function NewIssueDialog({ isOpen, onClose, onSubmit }: NewIssueDialogProp
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Comma-separated labels"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Parent (optional)
+              </label>
+              <select
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+              >
+                <option value="">None</option>
+                {parentOptions.map(issue => (
+                  <option key={issue.id} value={issue.id}>
+                    {issue.issue_type === 'epic' ? 'Epic' : issue.issue_type || 'Task'} · {issue.title || issue.id}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
