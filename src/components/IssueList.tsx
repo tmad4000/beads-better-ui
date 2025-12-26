@@ -80,6 +80,7 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedLabels, setSelectedLabels] = useState<string[]>([])
   const [labelMode, setLabelMode] = useState<'any' | 'all'>('any')
+  const [searchText, setSearchText] = useState<string>('')
 
   // Get all unique labels
   const allLabels = Array.from(
@@ -109,6 +110,14 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
         return selectedLabels.every(l => issueLabels.includes(l))
       }
     })
+  }
+  if (searchText.trim()) {
+    const needle = searchText.toLowerCase().trim()
+    filtered = filtered.filter(i =>
+      (i.title?.toLowerCase().includes(needle)) ||
+      (i.description?.toLowerCase().includes(needle)) ||
+      (i.id.toLowerCase().includes(needle))
+    )
   }
 
   // Sort issues
@@ -188,6 +197,25 @@ export function IssueList({ issues, onUpdateStatus }: IssueListProps) {
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
       {/* Filters */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 flex items-center gap-4 flex-wrap">
+        {/* Search */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="text-sm border border-gray-300 dark:border-slate-600 rounded px-3 py-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+          {searchText && (
+            <button
+              onClick={() => setSearchText('')}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600 dark:text-gray-400">Status:</label>
           <select
