@@ -3,6 +3,7 @@ import type { Issue, MessageType, ReplyEnvelope } from '../types'
 
 interface UseWebSocketReturn {
   connected: boolean
+  loading: boolean
   issues: Issue[]
   send: (type: MessageType, payload?: unknown) => Promise<unknown>
 }
@@ -15,6 +16,7 @@ function nextId(): string {
 
 export function useWebSocket(): UseWebSocketReturn {
   const [connected, setConnected] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [issues, setIssues] = useState<Issue[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const pendingRef = useRef<Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>>(new Map())
@@ -81,6 +83,7 @@ export function useWebSocket(): UseWebSocketReturn {
             const payload = data.payload as { items?: Issue[] }
             if (payload?.items) {
               setIssues(payload.items)
+              setLoading(false)
             }
           } else if (data.type === 'upsert') {
             const payload = data.payload as { item?: Issue }
@@ -114,5 +117,5 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   }, [])
 
-  return { connected, issues, send }
+  return { connected, loading, issues, send }
 }
