@@ -637,21 +637,48 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 hidden sm:table-cell">
                 Type
               </th>
               <SortHeader field="priority">Priority</SortHeader>
               <SortHeader field="title">Title</SortHeader>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
                 Labels
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16" title="Dependencies">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 hidden md:table-cell" title="Dependencies">
                 Deps
               </th>
               <SortHeader field="status">Status</SortHeader>
-              <SortHeader field="created_at">Created</SortHeader>
-              <SortHeader field="updated_at">Updated</SortHeader>
-              <SortHeader field="closed_at">Closed</SortHeader>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
+                <div className="flex items-center gap-1 cursor-pointer" onClick={() => handleSort('created_at')}>
+                  Created
+                  {sortField === 'created_at' && (
+                    <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                <div className="flex items-center gap-1 cursor-pointer" onClick={() => handleSort('updated_at')}>
+                  Updated
+                  {sortField === 'updated_at' && (
+                    <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden xl:table-cell">
+                <div className="flex items-center gap-1 cursor-pointer" onClick={() => handleSort('closed_at')}>
+                  Closed
+                  {sortField === 'closed_at' && (
+                    <span className="text-gray-400 dark:text-gray-500" aria-hidden="true">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
@@ -690,7 +717,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                     {issue.id.split('-').pop()}
                   </button>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 hidden sm:table-cell">
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
                     {issue.issue_type || 'task'}
                   </span>
@@ -733,7 +760,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 hidden lg:table-cell">
                   <div className="flex flex-wrap gap-1">
                     {(issue.labels || []).map(label => (
                       <span
@@ -745,7 +772,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                     ))}
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 hidden md:table-cell">
                   {(issue.dependency_count ?? 0) > 0 || (issue.dependent_count ?? 0) > 0 ? (
                     <div className="flex items-center gap-1 text-xs">
                       {(issue.dependency_count ?? 0) > 0 && (
@@ -783,19 +810,19 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                     <option value="deferred">Deferred</option>
                   </select>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">
                   {(() => {
                     const { display, full } = formatDate(issue.created_at)
                     return <span title={full}>{display}</span>
                   })()}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
                   {(() => {
                     const { display, full } = formatDate(issue.updated_at)
                     return <span title={full}>{display}</span>
                   })()}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden xl:table-cell">
                   {issue.closed_at ? (() => {
                     const { display, full } = formatDate(issue.closed_at)
                     return <span title={full}>{display}</span>
