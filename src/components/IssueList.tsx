@@ -119,6 +119,8 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
   const [focusedIndex, setFocusedIndex] = useState<number>(-1)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState<string>('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkAction, setBulkAction] = useState<'none' | 'closing' | 'deleting'>('none')
 
   // Sync state to URL
   useEffect(() => {
@@ -325,6 +327,56 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
   function startEditing(issue: Issue) {
     setEditingId(issue.id)
     setEditingTitle(issue.title || '')
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === sorted.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sorted.map(i => i.id)))
+    }
+  }
+
+  async function handleBulkClose() {
+    setBulkAction('closing')
+    try {
+      for (const id of selectedIds) {
+        await onUpdateStatus('update-status', { id, status: 'closed' })
+      }
+      showToast(`Closed ${selectedIds.size} issues`, 'success')
+      setSelectedIds(new Set())
+    } catch {
+      showToast('Failed to close some issues', 'error')
+    } finally {
+      setBulkAction('none')
+    }
+  }
+
+  async function handleBulkDelete() {
+    setBulkAction('deleting')
+    try {
+      for (const id of selectedIds) {
+        await onUpdateStatus('delete-issue' as MessageType, { id })
+      }
+      showToast(`Deleted ${selectedIds.size} issues`, 'success')
+      setSelectedIds(new Set())
+    } catch {
+      showToast('Failed to delete some issues', 'error')
+    } finally {
+      setBulkAction('none')
+    }
   }
 
   return (
@@ -539,11 +591,49 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-200 dark:border-indigo-800 flex items-center gap-4">
+          <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+            {selectedIds.size} selected
+          </span>
+          <button
+            onClick={handleBulkClose}
+            disabled={bulkAction !== 'none'}
+            className="px-3 py-1 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded disabled:opacity-50"
+          >
+            {bulkAction === 'closing' ? 'Closing...' : 'Close All'}
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkAction !== 'none'}
+            className="px-3 py-1 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded disabled:opacity-50"
+          >
+            {bulkAction === 'deleting' ? 'Deleting...' : 'Delete All'}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700" role="grid" aria-label="Issues list">
           <thead className="bg-gray-50 dark:bg-slate-800/50">
             <tr>
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === sorted.length && sorted.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 dark:border-slate-600 rounded focus:ring-indigo-500 dark:bg-slate-700"
+                  aria-label="Select all issues"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                 ID
               </th>
@@ -570,9 +660,18 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                 key={issue.id}
                 className={`hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
                   focusedIndex === index ? 'bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-inset ring-indigo-500' : ''
-                }`}
+                } ${selectedIds.has(issue.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}
                 onClick={() => onIssueClick?.(issue)}
               >
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(issue.id)}
+                    onChange={() => toggleSelect(issue.id)}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 dark:border-slate-600 rounded focus:ring-indigo-500 dark:bg-slate-700"
+                    aria-label={`Select ${issue.title || issue.id}`}
+                  />
+                </td>
                 <td className="px-4 py-3 text-sm font-mono">
                   <button
                     onClick={async (e) => {
