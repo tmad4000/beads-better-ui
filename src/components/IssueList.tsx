@@ -104,7 +104,8 @@ function getInitialStateFromUrl() {
   return {
     sortField: (params.get('sort') as SortField) || 'priority',
     sortDirection: (params.get('dir') as SortDirection) || 'asc',
-    statusFilter: params.get('status') || 'all',
+    // Default to 'open' instead of 'all' - most common use case
+    statusFilter: params.get('status') || 'open',
     typeFilter: params.get('type') || 'all',
     priorityFilter: params.get('priority') || 'all',
     assigneeFilter: params.get('assignee') || 'all',
@@ -255,7 +256,15 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
 
   // Filter issues
   let filtered = issues
-  if (statusFilter !== 'all') {
+  if (statusFilter === 'recent') {
+    // Show issues closed in the last 7 days
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    filtered = filtered.filter(i => {
+      if (i.status !== 'closed' || !i.closed_at) return false
+      const closedTime = new Date(i.closed_at).getTime()
+      return closedTime >= sevenDaysAgo
+    })
+  } else if (statusFilter !== 'all') {
     filtered = filtered.filter(i => i.status === statusFilter)
   }
   if (typeFilter !== 'all') {
@@ -518,9 +527,28 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
                 ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
-            title="Show ready-to-work issues (open, no blockers)"
+            title="Show open issues"
           >
-            Ready
+            Open
+          </button>
+          <button
+            onClick={() => {
+              setStatusFilter('recent')
+              setSortField('closed_at')
+              setSortDirection('desc')
+              setTypeFilter('all')
+              setPriorityFilter('all')
+              setAssigneeFilter('all')
+              setSelectedLabels([])
+            }}
+            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              statusFilter === 'recent'
+                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title="Show issues closed in the last 7 days"
+          >
+            Recent
           </button>
           <button
             onClick={() => {
@@ -534,10 +562,10 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
             }}
             className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
               statusFilter === 'closed'
-                ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                ? 'bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300'
                 : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600'
             }`}
-            title="Show recently closed issues"
+            title="Show all closed issues"
           >
             Closed
           </button>
