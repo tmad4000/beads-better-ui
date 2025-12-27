@@ -135,16 +135,20 @@ async function createWindow(projectPath) {
   // Add to recent projects
   addRecentProject(projectPath)
 
-  // Set dock icon on macOS
-  if (process.platform === 'darwin' && windows.size === 1) {
-    const iconPath = isDev
-      ? path.join(__dirname, '..', 'assets', 'BeadsUI.icns')
-      : path.join(process.resourcesPath, 'assets', 'BeadsUI.icns')
-
-    if (fs.existsSync(iconPath)) {
-      app.dock.setIcon(iconPath)
-    }
-  }
+  // Set dock icon on macOS - disabled for now due to icon loading issues
+  // if (process.platform === 'darwin' && windows.size === 1) {
+  //   try {
+  //     const iconPath = isDev
+  //       ? path.join(__dirname, '..', 'assets', 'BeadsUI.icns')
+  //       : path.join(process.resourcesPath, 'assets', 'BeadsUI.icns')
+  //
+  //     if (fs.existsSync(iconPath)) {
+  //       app.dock.setIcon(iconPath)
+  //     }
+  //   } catch (e) {
+  //     console.error('Failed to set dock icon:', e)
+  //   }
+  // }
 
   if (isDev) {
     // In development, load from Vite dev server with server port param
@@ -156,12 +160,12 @@ async function createWindow(projectPath) {
     window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
   }
 
-  // Inject the server port into the page
+  // Send config to renderer via IPC
   window.webContents.on('did-finish-load', () => {
-    window.webContents.executeJavaScript(`
-      window.__BEADS_SERVER_PORT__ = ${port};
-      window.__BEADS_PROJECT_PATH__ = "${projectPath.replace(/"/g, '\\"')}";
-    `)
+    window.webContents.send('beads-config', {
+      port,
+      projectPath
+    })
   })
 
   window.on('closed', () => {

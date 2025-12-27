@@ -25,6 +25,40 @@ npm install
 npm run dev
 ```
 
+## File Loading Support
+
+The UI can open issue files directly, without needing a WebSocket connection:
+
+### Supported Formats
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| **MarkTree** | `.mt` | JSON-based hierarchical document format |
+| **Beads JSONL** | `.jsonl` | Line-delimited JSON (native Beads format) |
+| **JSON** | `.json` | Array of issues or MarkTree format |
+
+### How to Use
+
+1. Click the **Open** button in the header
+2. Select a `.mt`, `.json`, or `.jsonl` file
+3. Issues will display in the UI (read-only mode)
+
+Or when the WebSocket isn't connected, click "open a file" in the loading screen.
+
+### Export
+
+Click the **Export** button to save current issues as:
+- `.jsonl` - Beads-compatible format
+- `.mt` - MarkTree format (for use with MarkTree app)
+
+### MarkTree Compatibility
+
+This UI can open MarkTree (`.mt`) files created by the [MarkTree](https://github.com/tmad4000/Gemini3Workflowy) app. The formats are bidirectionally compatible:
+
+- Open `.mt` files in this UI to view with Beads Better UI's interface
+- Export to `.mt` to edit in MarkTree's visual outliner
+- Both apps can open `.beads/issues.jsonl` files
+
 ## Features
 
 See beads issues for the full feature list and roadmap.

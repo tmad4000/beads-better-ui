@@ -8,6 +8,18 @@ interface UseWebSocketReturn {
   send: (type: MessageType, payload?: unknown) => Promise<unknown>
 }
 
+interface BeadsAPI {
+  getConfig: () => { port: number; projectPath: string } | null
+  onConfigReady: (callback: (config: { port: number; projectPath: string }) => void) => void
+  platform: string
+}
+
+declare global {
+  interface Window {
+    beadsAPI?: BeadsAPI
+  }
+}
+
 function nextId(): string {
   const now = Date.now().toString(36)
   const rand = Math.random().toString(36).slice(2, 8)
@@ -34,20 +46,7 @@ export function useWebSocket(): UseWebSocketReturn {
   }, [])
 
   useEffect(() => {
-    // Check for Electron-injected server port, otherwise use Vite proxy
-    const electronPort = (window as unknown as { __BEADS_SERVER_PORT__?: number }).__BEADS_SERVER_PORT__
-
-    let wsUrl: string
-    if (electronPort) {
-      // Running in Electron - connect directly to the server
-      wsUrl = `ws://localhost:${electronPort}/ws`
-    } else {
-      // Running in browser - use Vite proxy
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      wsUrl = `${protocol}//${window.location.host}/ws`
-    }
-
-    function connect() {
+    function connectWithUrl(wsUrl: string) {
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
@@ -65,7 +64,7 @@ export function useWebSocket(): UseWebSocketReturn {
       ws.onclose = () => {
         setConnected(false)
         // Reconnect after delay
-        setTimeout(connect, 2000)
+        setTimeout(() => connectWithUrl(wsUrl), 2000)
       }
 
       ws.onerror = () => {
@@ -120,7 +119,19 @@ export function useWebSocket(): UseWebSocketReturn {
       }
     }
 
-    connect()
+    // Check if we're in Electron
+    if (window.beadsAPI) {
+      // Wait for config from main process
+      window.beadsAPI.onConfigReady((config) => {
+        const wsUrl = `ws://localhost:${config.port}/ws`
+        connectWithUrl(wsUrl)
+      })
+    } else {
+      // Running in browser - use Vite proxy
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const wsUrl = `${protocol}//${window.location.host}/ws`
+      connectWithUrl(wsUrl)
+    }
 
     return () => {
       wsRef.current?.close()

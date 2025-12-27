@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { IssueList } from './components/IssueList'
 import { IssueOutline } from './components/IssueOutline'
 import { KanbanBoard } from './components/KanbanBoard'
@@ -6,6 +6,7 @@ import { IssueDetailPanel } from './components/IssueDetailPanel'
 import { NewIssueDialog, type NewIssueData } from './components/NewIssueDialog'
 import { ToastContainer } from './components/Toast'
 import { useWebSocket } from './hooks/useWebSocket'
+import { loadFile, issuesToJsonl, issuesToMarkTree } from './fileLoader'
 import type { Issue } from './types'
 
 type ViewMode = 'list' | 'kanban' | 'outline'
@@ -127,13 +128,74 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
 }
 
 function App() {
-  const { connected, loading, issues, send } = useWebSocket()
+  const { connected, loading, issues: wsIssues, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+
+  // File loading state
+  const [fileIssues, setFileIssues] = useState<Issue[] | null>(null)
+  const [loadedFileName, setLoadedFileName] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Use file issues if loaded, otherwise use WebSocket issues
+  const issues = fileIssues ?? wsIssues
+  const isFileMode = fileIssues !== null
+
+  // Handle file loading
+  const handleFileLoad = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        const loadedIssues = loadFile(content, file.name)
+        setFileIssues(loadedIssues)
+        setLoadedFileName(file.name)
+
+        // Extract project name from first issue ID
+        if (loadedIssues.length > 0) {
+          const firstId = loadedIssues[0].id
+          const prefix = firstId.replace(/-[a-z0-9]+$/i, '').replace(/-\d+$/, '')
+          setBeadsInfo({
+            project: prefix || file.name.replace(/\.[^.]+$/, ''),
+            issueCount: loadedIssues.length,
+          })
+        }
+      } catch (err) {
+        alert(`Failed to load file: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset input so same file can be loaded again
+    event.target.value = ''
+  }, [])
+
+  // Clear loaded file and return to WebSocket mode
+  const clearFileMode = useCallback(() => {
+    setFileIssues(null)
+    setLoadedFileName(null)
+    setBeadsInfo(null)
+  }, [])
+
+  // Export current issues
+  const handleExport = useCallback((format: 'jsonl' | 'mt') => {
+    const content = format === 'jsonl' ? issuesToJsonl(issues) : issuesToMarkTree(issues)
+    const ext = format === 'jsonl' ? 'jsonl' : 'mt'
+    const blob = new Blob([content], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `issues.${ext}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [issues])
 
   // Fetch project info on connect
   useEffect(() => {
@@ -279,7 +341,22 @@ function App() {
                 {beadsInfo.issueCount} issues
               </span>
             )}
-            {projectInfo && (
+            {isFileMode && loadedFileName && (
+              <span className="flex items-center gap-2 px-2 py-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                {loadedFileName}
+                <button
+                  onClick={clearFileMode}
+                  className="ml-1 hover:text-amber-900 dark:hover:text-amber-200"
+                  title="Close file"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {projectInfo && !isFileMode && (
               <button
                 onClick={openInFinder}
                 className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
@@ -293,6 +370,56 @@ function App() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".mt,.json,.jsonl"
+              onChange={handleFileLoad}
+              className="hidden"
+            />
+
+            {/* Open File button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-md transition-colors"
+              title="Open .mt, .json, or .jsonl file"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+              </svg>
+              Open
+            </button>
+
+            {/* Export dropdown - show when issues exist */}
+            {issues.length > 0 && (
+              <div className="relative group">
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-md transition-colors"
+                  title="Export issues"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Export
+                </button>
+                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  <button
+                    onClick={() => handleExport('jsonl')}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  >
+                    Export as .jsonl
+                  </button>
+                  <button
+                    onClick={() => handleExport('mt')}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  >
+                    Export as .mt
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Epics Quick Filter */}
             <button
               onClick={() => {
@@ -381,12 +508,15 @@ function App() {
 
       {/* Main Content */}
       <main className="p-6">
-        {!connected ? (
+        {!connected && !isFileMode ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Spinner />
             <p className="text-gray-500 dark:text-gray-400">Connecting to server...</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500">
+              Or <button onClick={() => fileInputRef.current?.click()} className="text-indigo-600 dark:text-indigo-400 hover:underline">open a file</button> to view issues offline
+            </p>
           </div>
-        ) : loading ? (
+        ) : loading && !isFileMode ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Spinner />
             <p className="text-gray-500 dark:text-gray-400">Loading issues...</p>

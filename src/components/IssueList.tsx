@@ -1080,6 +1080,13 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
                     />
                   ) : (
                     <div className="flex items-center gap-2">
+                      {/* Needs review indicator */}
+                      {issue.status === 'closed' && !seenIds.has(issue.id) && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0"
+                          title="Needs review"
+                        />
+                      )}
                       <span
                         className="truncate cursor-text"
                         onDoubleClick={(e) => {
