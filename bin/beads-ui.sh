@@ -3,6 +3,8 @@
 # Usage: beads-ui [project-path]
 
 PROJECT_DIR="${1:-$(pwd)}"
+# Resolve to absolute path
+PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
 UI_DIR="$HOME/code/beads-better-ui"
 
 # Check if it's a beads project
@@ -11,6 +13,12 @@ if [ ! -d "$PROJECT_DIR/.beads" ]; then
   echo "Run 'bd init <prefix>' first to initialize beads"
   exit 1
 fi
+
+# Get project name from directory
+PROJECT_NAME=$(basename "$PROJECT_DIR")
+
+# Set terminal title
+echo -ne "\033]0;Beads UI - $PROJECT_NAME\007"
 
 # Find an available port
 PORT=5173

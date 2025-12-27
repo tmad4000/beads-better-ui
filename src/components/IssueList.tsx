@@ -6,6 +6,8 @@ interface IssueListProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
   onIssueClick?: (issue: Issue) => void
+  seenIds?: Set<string>
+  onMarkSeen?: (id: string) => void
 }
 
 type SortField = 'priority' | 'created_at' | 'updated_at' | 'closed_at' | 'title' | 'status'
@@ -115,7 +117,7 @@ function getInitialStateFromUrl() {
   }
 }
 
-export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListProps) {
+export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new Set(), onMarkSeen }: IssueListProps) {
   const initial = getInitialStateFromUrl()
   const [sortField, setSortField] = useState<SortField>(initial.sortField)
   const [sortDirection, setSortDirection] = useState<SortDirection>(initial.sortDirection)
@@ -149,6 +151,16 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
   })
   const [showSaveView, setShowSaveView] = useState(false)
   const [newViewName, setNewViewName] = useState('')
+  const [reviewSectionOpen, setReviewSectionOpen] = useState(true)
+
+  // Compute unseen closed issues (needs review) - sorted by closed_at desc
+  const needsReviewIssues = issues
+    .filter(i => i.status === 'closed' && !seenIds.has(i.id))
+    .sort((a, b) => {
+      const aTime = a.closed_at ? new Date(a.closed_at).getTime() : 0
+      const bTime = b.closed_at ? new Date(b.closed_at).getTime() : 0
+      return bTime - aTime // descending - newest first
+    })
 
   // Persist pinned issues to localStorage
   useEffect(() => {
@@ -863,6 +875,62 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick }: IssueListPro
           >
             Clear Selection
           </button>
+        </div>
+      )}
+
+      {/* Needs Review Section */}
+      {needsReviewIssues.length > 0 && (
+        <div className="border-b border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
+          <button
+            onClick={() => setReviewSectionOpen(!reviewSectionOpen)}
+            className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className={`transition-transform ${reviewSectionOpen ? 'rotate-90' : ''}`}>▶</span>
+              <span>Needs Review</span>
+              <span className="px-1.5 py-0.5 text-xs bg-purple-200 dark:bg-purple-800 rounded-full">
+                {needsReviewIssues.length}
+              </span>
+            </div>
+          </button>
+          {reviewSectionOpen && (
+            <div className="px-4 pb-3 space-y-1">
+              {needsReviewIssues.map(issue => (
+                <div
+                  key={issue.id}
+                  className="flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-md border border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" title="Needs review" />
+                  <button
+                    onClick={() => onIssueClick?.(issue)}
+                    className="flex-1 text-left text-sm text-gray-700 dark:text-gray-300 hover:text-purple-700 dark:hover:text-purple-300 truncate"
+                  >
+                    <span className="font-mono text-xs text-gray-400 dark:text-gray-500 mr-2">
+                      {issue.id.split('-').pop()}
+                    </span>
+                    {issue.title || 'Untitled'}
+                  </button>
+                  {issue.closed_at && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500" title={new Date(issue.closed_at).toLocaleString()}>
+                      {formatDate(issue.closed_at).display}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onMarkSeen?.(issue.id)
+                    }}
+                    className="p-1 text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                    title="Mark as reviewed"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,8 +1,41 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
+import { readFile, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 
 const PORT = process.env.PORT || 3001
+const SEEN_FILE = join(process.cwd(), '.beads', 'seen.json')
+const PROJECT_PATH = process.cwd()
+
+// Read seen.json file
+async function readSeenFile() {
+  try {
+    if (!existsSync(SEEN_FILE)) {
+      return { seen: [], updated_at: null }
+    }
+    const content = await readFile(SEEN_FILE, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return { seen: [], updated_at: null }
+  }
+}
+
+// Write seen.json file
+async function writeSeenFile(data) {
+  try {
+    const content = JSON.stringify({
+      seen: data.seen || [],
+      updated_at: new Date().toISOString()
+    }, null, 2)
+    await writeFile(SEEN_FILE, content, 'utf-8')
+    return true
+  } catch (err) {
+    console.error('Error writing seen.json:', err)
+    return false
+  }
+}
 
 // Run bd CLI command
 function runBd(args) {
@@ -279,6 +312,57 @@ wss.on('connection', (ws) => {
               response.payload = Array.isArray(showResult.data) ? showResult.data[0] : showResult.data
             }
           }
+          break
+        }
+
+        case 'get-seen': {
+          const seenData = await readSeenFile()
+          response.payload = seenData
+          break
+        }
+
+        case 'mark-seen': {
+          const { id: issueId } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          const seenData = await readSeenFile()
+          if (!seenData.seen.includes(issueId)) {
+            seenData.seen.push(issueId)
+            await writeSeenFile(seenData)
+          }
+          response.payload = seenData
+          break
+        }
+
+        case 'mark-unseen': {
+          const { id: issueId } = payload || {}
+          if (!issueId) {
+            response.ok = false
+            response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
+            break
+          }
+          const seenData = await readSeenFile()
+          seenData.seen = seenData.seen.filter(id => id !== issueId)
+          await writeSeenFile(seenData)
+          response.payload = seenData
+          break
+        }
+
+        case 'get-project-info': {
+          response.payload = {
+            path: PROJECT_PATH,
+            name: PROJECT_PATH.split('/').pop()
+          }
+          break
+        }
+
+        case 'open-in-finder': {
+          const { spawn: spawnSync } = await import('node:child_process')
+          spawnSync('open', [PROJECT_PATH], { detached: true })
+          response.payload = { opened: true }
           break
         }
 

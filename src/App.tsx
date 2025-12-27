@@ -15,6 +15,11 @@ interface BeadsInfo {
   issueCount: number
 }
 
+interface ProjectInfo {
+  path: string
+  name: string
+}
+
 function Spinner() {
   return (
     <svg
@@ -58,6 +63,12 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
     { keys: ['?'], action: 'Show shortcuts' },
   ]
 
+  const terminalCommands = [
+    { cmd: 'beads-ui', desc: 'Open UI for current directory' },
+    { cmd: 'beads-ui /path', desc: 'Open UI for specific project' },
+    { cmd: 'beads-ui-list', desc: 'Show running instances' },
+  ]
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -65,10 +76,10 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Keyboard Shortcuts
+            Help
           </h2>
           <button
             onClick={onClose}
@@ -77,7 +88,9 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
             ×
           </button>
         </div>
-        <div className="space-y-2">
+
+        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Keyboard Shortcuts</h3>
+        <div className="space-y-2 mb-6">
           {shortcuts.map((s, i) => (
             <div key={i} className="flex items-center justify-between py-1">
               <span className="text-sm text-gray-600 dark:text-gray-400">{s.action}</span>
@@ -94,6 +107,20 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
+
+        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Terminal Commands</h3>
+        <div className="space-y-2 mb-4">
+          {terminalCommands.map((c, i) => (
+            <div key={i} className="flex items-center justify-between py-1">
+              <code className="text-sm font-mono text-indigo-600 dark:text-indigo-400">{c.cmd}</code>
+              <span className="text-xs text-gray-500 dark:text-gray-500">{c.desc}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Dock app: ~/Applications/BeadsUI.app
+        </p>
       </div>
     </div>
   )
@@ -102,10 +129,63 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
 function App() {
   const { connected, loading, issues, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+
+  // Fetch project info on connect
+  useEffect(() => {
+    if (connected) {
+      send('get-project-info', {}).then((result) => {
+        if (result && typeof result === 'object' && 'path' in result) {
+          setProjectInfo(result as ProjectInfo)
+        }
+      }).catch(() => {})
+    }
+  }, [connected, send])
+
+  // Track which closed issues have been "seen" (reviewed)
+  // Stored in .beads/seen.json, synced via git
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set())
+
+  // Fetch seen state from server on connect
+  useEffect(() => {
+    if (connected) {
+      send('get-seen', {}).then((result) => {
+        if (result && typeof result === 'object' && 'seen' in result) {
+          setSeenIds(new Set((result as { seen: string[] }).seen))
+        }
+      }).catch(() => {
+        // Silently fail - will just show all closed as needing review
+      })
+    }
+  }, [connected, send])
+
+  const markSeen = useCallback((id: string) => {
+    setSeenIds(prev => new Set([...prev, id]))
+    send('mark-seen', { id }).catch(() => {
+      // Revert on error
+      setSeenIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    })
+  }, [send])
+
+  const markUnseen = useCallback((id: string) => {
+    setSeenIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+    send('mark-unseen', { id }).catch(() => {
+      // Revert on error
+      setSeenIds(prev => new Set([...prev, id]))
+    })
+  }, [send])
 
   // Detect system dark mode preference
   useEffect(() => {
@@ -181,6 +261,10 @@ function App() {
     await send('delete-issue', { id })
   }, [send])
 
+  const openInFinder = useCallback(() => {
+    send('open-in-finder', {}).catch(() => {})
+  }, [send])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
       {/* Header */}
@@ -195,8 +279,35 @@ function App() {
                 {beadsInfo.issueCount} issues
               </span>
             )}
+            {projectInfo && (
+              <button
+                onClick={openInFinder}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                title={`Open ${projectInfo.path} in Finder`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+                <span className="font-mono truncate max-w-[200px]">{projectInfo.path.replace(/^\/Users\/[^/]+/, '~')}</span>
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Epics Quick Filter */}
+            <button
+              onClick={() => {
+                window.location.search = '?type=epic&status=all'
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                window.location.search.includes('type=epic')
+                  ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                  : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-300 dark:border-slate-600'
+              }`}
+              title="View all epics"
+            >
+              Epics
+            </button>
+
             {/* View Toggle */}
             <div className="flex rounded-md border border-gray-300 dark:border-slate-600 overflow-hidden">
               <button
@@ -291,7 +402,7 @@ function App() {
             </button>
           </div>
         ) : viewMode === 'list' ? (
-          <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
+          <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} seenIds={seenIds} onMarkSeen={markSeen} />
         ) : viewMode === 'outline' ? (
           <IssueOutline issues={issues} onUpdate={send} onIssueClick={setSelectedIssue} />
         ) : (
@@ -312,6 +423,8 @@ function App() {
         onUpdate={send}
         onDelete={handleDeleteIssue}
         onIssueSelect={setSelectedIssue}
+        seenIds={seenIds}
+        onMarkUnseen={markUnseen}
       />
 
       {showShortcuts && (
