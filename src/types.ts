@@ -58,6 +58,8 @@ export type MessageType =
   | 'get-seen'
   | 'mark-seen'
   | 'mark-unseen'
+  | 'get-project-info'
+  | 'open-in-finder'
   | 'snapshot'
   | 'upsert'
   | 'delete'

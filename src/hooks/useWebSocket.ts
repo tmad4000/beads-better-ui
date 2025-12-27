@@ -34,8 +34,18 @@ export function useWebSocket(): UseWebSocketReturn {
   }, [])
 
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/ws`
+    // Check for Electron-injected server port, otherwise use Vite proxy
+    const electronPort = (window as unknown as { __BEADS_SERVER_PORT__?: number }).__BEADS_SERVER_PORT__
+
+    let wsUrl: string
+    if (electronPort) {
+      // Running in Electron - connect directly to the server
+      wsUrl = `ws://localhost:${electronPort}/ws`
+    } else {
+      // Running in browser - use Vite proxy
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      wsUrl = `${protocol}//${window.location.host}/ws`
+    }
 
     function connect() {
       const ws = new WebSocket(wsUrl)
