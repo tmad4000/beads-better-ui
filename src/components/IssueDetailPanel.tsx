@@ -62,20 +62,24 @@ function getExternalRefLink(ref?: string): { url: string; label: string } | null
   return { url: '#', label: ref }
 }
 
-// Format comment timestamp
+// Format comment timestamp (compact relative format)
 function formatCommentDate(timestamp: number): string {
   const date = new Date(timestamp)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
+  const diffSecs = Math.floor(diffMs / 1000)
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
 
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  if (diffSecs < 60) return 'now'
+  if (diffMins < 60) return `${diffMins}m`
+  if (diffHours < 24) return `${diffHours}h`
+  if (diffDays < 30) return `${diffDays}d`
+  if (diffMonths < 12) return `${diffMonths}mo`
+  return `${diffYears}y`
 }
 
 export function IssueDetailPanel({ issue, onClose, onUpdate, onDelete, onIssueSelect, seenIds = new Set(), onMarkUnseen }: IssueDetailPanelProps) {

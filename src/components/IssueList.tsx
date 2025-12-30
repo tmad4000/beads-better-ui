@@ -46,7 +46,7 @@ function isStale(dateInput?: string | number): boolean {
   return diffDays >= 14
 }
 
-// Smart date formatting: relative for recent, short for older
+// Compact relative date formatting (GitHub-style)
 function formatDate(dateInput?: string | number): { display: string; full: string } {
   if (!dateInput) return { display: '-', full: '' }
 
@@ -55,36 +55,27 @@ function formatDate(dateInput?: string | number): { display: string; full: strin
 
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
+  const diffSecs = Math.floor(diffMs / 1000)
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
 
   const full = date.toLocaleString()
 
   // Less than 1 minute
-  if (diffMins < 1) return { display: 'just now', full }
+  if (diffSecs < 60) return { display: 'now', full }
   // Less than 1 hour
-  if (diffMins < 60) return { display: `${diffMins}m ago`, full }
+  if (diffMins < 60) return { display: `${diffMins}m`, full }
   // Less than 24 hours
-  if (diffHours < 24) return { display: `${diffHours}h ago`, full }
-  // Less than 7 days
-  if (diffDays < 7) {
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' })
-    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    return { display: `${dayName} ${time}`, full }
-  }
-  // Same year
-  if (date.getFullYear() === now.getFullYear()) {
-    return {
-      display: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      full
-    }
-  }
-  // Different year
-  return {
-    display: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }),
-    full
-  }
+  if (diffHours < 24) return { display: `${diffHours}h`, full }
+  // Less than 30 days
+  if (diffDays < 30) return { display: `${diffDays}d`, full }
+  // Less than 1 year
+  if (diffMonths < 12) return { display: `${diffMonths}mo`, full }
+  // 1+ years
+  return { display: `${diffYears}y`, full }
 }
 
 // Get human-readable sort direction hint
