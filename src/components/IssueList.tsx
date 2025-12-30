@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Issue, MessageType } from '../types'
 import { showToast } from './Toast'
 
+const isCompactMode = new URLSearchParams(window.location.search).has('compact')
+
 interface IssueListProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
@@ -497,7 +499,11 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
       {/* Filters */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 flex items-center gap-4 flex-wrap">
+      <div className={`border-b border-gray-200 dark:border-slate-700 flex items-center gap-3 ${
+        isCompactMode
+          ? 'px-2 py-1.5 overflow-x-auto scrollbar-thin'
+          : 'px-4 py-3 flex-wrap gap-4'
+      }`}>
         {/* Quick views */}
         <div className="flex items-center gap-1">
           <button

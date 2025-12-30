@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { Issue, MessageType } from '../types'
 import { showToast } from './Toast'
 
+const isCompactMode = new URLSearchParams(window.location.search).has('compact')
+
 interface KanbanBoardProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
@@ -56,11 +58,13 @@ export function KanbanBoard({ issues, onUpdateStatus, onIssueClick }: KanbanBoar
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className={`flex gap-3 overflow-x-auto pb-2 ${isCompactMode ? 'min-w-0' : ''}`}>
       {columns.map(column => (
         <div
           key={column.key}
-          className="flex-shrink-0 w-72 bg-gray-100 dark:bg-slate-800/50 rounded-lg"
+          className={`flex-shrink-0 bg-gray-100 dark:bg-slate-800/50 rounded-lg ${
+            isCompactMode ? 'w-44' : 'w-72'
+          }`}
         >
           {/* Column Header */}
           <div className="px-3 py-2 border-b border-gray-200 dark:border-slate-700 flex items-center gap-2">
