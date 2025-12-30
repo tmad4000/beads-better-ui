@@ -23,5 +23,12 @@ contextBridge.exposeInMainWorld('beadsAPI', {
       configCallbacks.push(callback)
     }
   },
+  openProjectDialog: async () => {
+    const result = await ipcRenderer.invoke('open-project-dialog')
+    if (result) {
+      beadsConfig = result
+    }
+    return result
+  },
   platform: process.platform
 })

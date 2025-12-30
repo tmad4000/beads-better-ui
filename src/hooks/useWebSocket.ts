@@ -11,6 +11,7 @@ interface UseWebSocketReturn {
 interface BeadsAPI {
   getConfig: () => { port: number; projectPath: string } | null
   onConfigReady: (callback: (config: { port: number; projectPath: string }) => void) => void
+  openProjectDialog: () => Promise<{ port: number; projectPath: string } | null>
   platform: string
 }
 

@@ -327,6 +327,21 @@ function App() {
     send('open-in-finder', {}).catch(() => {})
   }, [send])
 
+  const openDifferentProject = useCallback(async () => {
+    if (!window.beadsAPI?.openProjectDialog) {
+      // Not running in Electron, show alert
+      alert('Opening different projects is only supported in the Electron app.\n\nUse File > Open Project in the menu bar, or run:\nbeads-ui /path/to/project')
+      return
+    }
+
+    const result = await window.beadsAPI.openProjectDialog()
+    if (result) {
+      // Project changed - page will reconnect to new WebSocket automatically
+      // Force a page reload to reconnect to new server
+      window.location.reload()
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
       {/* Header */}
@@ -357,16 +372,40 @@ function App() {
               </span>
             )}
             {projectInfo && !isFileMode && (
-              <button
-                onClick={openInFinder}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
-                title={`Open ${projectInfo.path} in Finder`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-                <span className="font-mono truncate max-w-[200px]">{projectInfo.path.replace(/^\/Users\/[^/]+/, '~')}</span>
-              </button>
+              <div className="relative group">
+                <button
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
+                  title={projectInfo.path}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  <span className="font-mono truncate max-w-[200px]">{projectInfo.path.replace(/^\/Users\/[^/]+/, '~')}</span>
+                  <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute left-0 mt-1 w-48 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  <button
+                    onClick={openInFinder}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Open in Finder
+                  </button>
+                  <button
+                    onClick={openDifferentProject}
+                    className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    Open Different Folder...
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           <div className="flex items-center gap-3">

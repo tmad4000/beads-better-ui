@@ -353,3 +353,40 @@ app.on('before-quit', () => {
     }
   }
 })
+
+// IPC handler for opening a folder picker from renderer
+ipcMain.handle('open-project-dialog', async (event) => {
+  const projectPath = await selectProjectFolder()
+  if (!projectPath) return null
+
+  // Find the window that sent this request
+  const senderWindow = BrowserWindow.fromWebContents(event.sender)
+  if (!senderWindow) return null
+
+  const windowId = senderWindow.id
+  const windowData = windows.get(windowId)
+
+  if (windowData) {
+    // Kill old server
+    if (windowData.serverProcess) {
+      windowData.serverProcess.kill()
+    }
+
+    // Start new server for the new project
+    const { serverProcess, port } = await startServer(projectPath)
+
+    // Update window data
+    windows.set(windowId, { window: senderWindow, serverProcess, projectPath, port })
+
+    // Update window title
+    senderWindow.setTitle(`Beads UI - ${path.basename(projectPath)}`)
+
+    // Add to recent projects
+    addRecentProject(projectPath)
+
+    // Return new config to renderer
+    return { port, projectPath }
+  }
+
+  return null
+})
