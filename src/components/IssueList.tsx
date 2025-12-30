@@ -4,6 +4,9 @@ import { showToast } from './Toast'
 
 const isCompactMode = new URLSearchParams(window.location.search).has('compact')
 
+// In compact mode, filters are collapsible - default collapsed
+const useCollapsibleFilters = isCompactMode
+
 interface IssueListProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
@@ -143,6 +146,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
     }
   })
   const [showSaveView, setShowSaveView] = useState(false)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(useCollapsibleFilters)
   const [newViewName, setNewViewName] = useState('')
   const [reviewSectionOpen, setReviewSectionOpen] = useState(true)
 
@@ -498,14 +502,36 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
-      {/* Filters */}
-      <div className={`border-b border-gray-200 dark:border-slate-700 flex items-center gap-3 ${
-        isCompactMode
-          ? 'px-2 py-1.5 overflow-x-auto scrollbar-thin'
-          : 'px-4 py-3 flex-wrap gap-4'
+      {/* Filters - collapsible in compact mode */}
+      <div className={`border-b border-gray-200 dark:border-slate-700 ${
+        isCompactMode ? 'px-2 py-1' : 'px-4 py-3'
       }`}>
+        {/* Compact mode: collapsible header */}
+        {isCompactMode && (
+          <button
+            onClick={() => setFiltersCollapsed(!filtersCollapsed)}
+            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 w-full"
+          >
+            <svg className={`w-3 h-3 transition-transform ${filtersCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <span>Filters</span>
+            {(statusFilter !== 'open' || typeFilter !== 'all' || priorityFilter !== 'all' || selectedLabels.length > 0) && (
+              <span className="ml-1 px-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded text-[10px]">
+                active
+              </span>
+            )}
+          </button>
+        )}
+
+        {/* Filter controls - hidden when collapsed in compact mode */}
+        <div className={`flex items-center gap-2 ${
+          isCompactMode
+            ? `overflow-x-auto scrollbar-thin mt-1 ${filtersCollapsed ? 'hidden' : ''}`
+            : 'flex-wrap gap-4'
+        }`}>
         {/* Quick views */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => {
               setStatusFilter('blocked')
@@ -633,10 +659,10 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
           )}
         </div>
 
-        <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+        {!isCompactMode && <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />}
 
-        {/* Saved Views */}
-        <div className="flex items-center gap-1">
+        {/* Saved Views - hidden in compact mode */}
+        {!isCompactMode && <div className="flex items-center gap-1">
           {savedViews.length > 0 && (
             <div className="relative group">
               <button
@@ -714,9 +740,9 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
               + Save View
             </button>
           )}
-        </div>
+        </div>}
 
-        <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+        {!isCompactMode && <div className="w-px h-6 bg-gray-300 dark:bg-slate-600" />}
 
         {/* Search */}
         <div className="flex items-center gap-2">
@@ -841,8 +867,9 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
           </div>
         )}
 
-        <div className="ml-auto text-sm text-gray-500 dark:text-gray-400">
-          {sorted.length} of {issues.length} issues
+        <div className="ml-auto text-sm text-gray-500 dark:text-gray-400 flex-shrink-0 whitespace-nowrap">
+          {sorted.length}/{issues.length}
+        </div>
         </div>
       </div>
 
