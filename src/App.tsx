@@ -11,6 +11,9 @@ import type { Issue } from './types'
 
 type ViewMode = 'list' | 'kanban' | 'outline'
 
+// Detect compact mode from URL param (used when embedded in Swift panel)
+const isCompactMode = new URLSearchParams(window.location.search).has('compact')
+
 interface BeadsInfo {
   project: string
   issueCount: number
@@ -343,8 +346,54 @@ function App() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
-      {/* Header */}
+    <div className={`min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors ${isCompactMode ? 'compact-mode' : ''}`}>
+      {/* Compact Header for embedded mode */}
+      {isCompactMode ? (
+        <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+                {beadsInfo?.project || 'Issues'}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {beadsInfo?.issueCount || issues.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {/* Compact view toggle */}
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1 rounded ${viewMode === 'list' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="List"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`p-1 rounded ${viewMode === 'kanban' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Kanban"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+              </button>
+              {/* New issue button */}
+              <button
+                onClick={() => setShowNewIssue(true)}
+                className="p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                title="New issue"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+      ) : (
+      /* Full Header */
       <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -544,9 +593,10 @@ function App() {
           </div>
         </div>
       </header>
+      )}
 
       {/* Main Content */}
-      <main className="p-6">
+      <main className={isCompactMode ? "p-2" : "p-6"}>
         {!connected && !isFileMode ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Spinner />
