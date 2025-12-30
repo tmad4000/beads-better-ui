@@ -2,12 +2,29 @@ import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname, extname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const PORT = process.env.PORT || 3001
 const SEEN_FILE = join(process.cwd(), '.beads', 'seen.json')
 const PROJECT_PATH = process.cwd()
+const DIST_DIR = join(__dirname, '..', 'dist')
+
+// MIME types for static file serving
+const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+}
 
 // Read seen.json file
 async function readSeenFile() {
@@ -71,11 +88,51 @@ async function runBdJson(args) {
   }
 }
 
+// Serve static files from dist directory
+async function serveStatic(req, res) {
+  const url = new URL(req.url, `http://localhost:${PORT}`)
+  let filePath = url.pathname
+
+  // Default to index.html for root or paths without extension (SPA routing)
+  if (filePath === '/' || !extname(filePath)) {
+    filePath = '/index.html'
+  }
+
+  const fullPath = join(DIST_DIR, filePath)
+
+  // Security: prevent directory traversal
+  if (!fullPath.startsWith(DIST_DIR)) {
+    res.writeHead(403)
+    res.end('Forbidden')
+    return
+  }
+
+  try {
+    const content = await readFile(fullPath)
+    const ext = extname(filePath)
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream'
+    res.writeHead(200, { 'Content-Type': contentType })
+    res.end(content)
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      // For SPA: serve index.html for any path not found
+      try {
+        const indexContent = await readFile(join(DIST_DIR, 'index.html'))
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(indexContent)
+      } catch {
+        res.writeHead(404)
+        res.end('Not Found')
+      }
+    } else {
+      res.writeHead(500)
+      res.end('Internal Server Error')
+    }
+  }
+}
+
 // Create HTTP server
-const server = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Beads Better UI Server')
-})
+const server = createServer(serveStatic)
 
 // Create WebSocket server
 const wss = new WebSocketServer({ server })
