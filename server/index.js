@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,58 @@ const SEARCH_PATHS = [
   join(homedir(), 'projects'),
   join(homedir(), 'Developer'),
   join(homedir(), 'dev'),
+  join(homedir(), 'Documents', 'GitHub'),
 ]
+
+// Find all beads projects in search paths
+async function findAllBeadsProjects() {
+  const projects = []
+
+  for (const searchPath of SEARCH_PATHS) {
+    if (!existsSync(searchPath)) continue
+
+    try {
+      const entries = await readdir(searchPath, { withFileTypes: true })
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const projectPath = join(searchPath, entry.name)
+          if (existsSync(join(projectPath, '.beads'))) {
+            projects.push({
+              path: projectPath,
+              name: entry.name
+            })
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`Error scanning ${searchPath}:`, err)
+    }
+  }
+
+  return projects
+}
+
+// Fetch issues from all projects, tagged with source
+async function fetchGlobalIssues() {
+  const projects = await findAllBeadsProjects()
+  const allIssues = []
+
+  for (const project of projects) {
+    const result = await runBdJson(['list', '--json'], project.path)
+    if (result.ok) {
+      // Tag each issue with its source project
+      for (const issue of result.data) {
+        allIssues.push({
+          ...issue,
+          _project: project.name,
+          _projectPath: project.path
+        })
+      }
+    }
+  }
+
+  return { issues: allIssues, projects }
+}
 
 // MIME types for static file serving
 const MIME_TYPES = {
@@ -206,6 +257,32 @@ wss.on('connection', (ws, req) => {
       const client = clientData.get(ws)
 
       let response = { id, type, ok: true, payload: null }
+
+      // Handle global mode subscription
+      if (type === 'subscribe-global') {
+        client.subscriptions.add('global-issues')
+        client.projectPath = '__global__'  // Special marker
+
+        const { issues, projects } = await fetchGlobalIssues()
+        response.type = 'snapshot'
+        response.payload = {
+          id: 'global-issues',
+          type: 'snapshot',
+          items: issues,
+          projects: projects,
+          isGlobal: true
+        }
+        ws.send(JSON.stringify(response))
+        return
+      }
+
+      // Handle list-projects request
+      if (type === 'list-projects') {
+        const projects = await findAllBeadsProjects()
+        response.payload = { projects }
+        ws.send(JSON.stringify(response))
+        return
+      }
 
       // Handle set-project message to establish project context
       if (type === 'set-project') {

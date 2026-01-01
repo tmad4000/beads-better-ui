@@ -126,7 +126,7 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
 }
 
 function App() {
-  const { connected, loading, issues: wsIssues, projectPath, send } = useWebSocket()
+  const { connected, loading, issues: wsIssues, projectPath, isGlobalMode, projects, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
@@ -270,8 +270,14 @@ function App() {
   }, [issues, selectedIssue?.id])
 
   useEffect(() => {
-    // Extract project name from first issue ID prefix
-    if (issues.length > 0) {
+    if (isGlobalMode) {
+      setBeadsInfo({
+        project: 'All Projects',
+        issueCount: issues.length,
+      })
+      document.title = `All Projects (${projects.length}) - Beads Better UI`
+    } else if (issues.length > 0) {
+      // Extract project name from first issue ID prefix
       const firstId = issues[0].id
       const prefix = firstId.replace(/-[a-z0-9]+$/, '')
       setBeadsInfo({
@@ -280,7 +286,7 @@ function App() {
       })
       document.title = `${prefix} - Beads Better UI`
     }
-  }, [issues])
+  }, [issues, isGlobalMode, projects.length])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -589,27 +595,6 @@ function App() {
               Or <button onClick={() => fileInputRef.current?.click()} className="text-indigo-600 dark:text-indigo-400 hover:underline">open a file</button> to view issues offline
             </p>
           </div>
-        ) : connected && !projectPath && !isFileMode ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-4">
-            <svg className="w-16 h-16 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">No Project Selected</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
-              Open a beads project by adding its name or path to the URL:
-            </p>
-            <div className="flex flex-col gap-2 text-sm font-mono">
-              <code className="px-3 py-2 bg-gray-100 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300">
-                http://localhost:3050/<span className="text-indigo-600 dark:text-indigo-400">project-name</span>
-              </code>
-              <code className="px-3 py-2 bg-gray-100 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300">
-                http://localhost:3050/<span className="text-indigo-600 dark:text-indigo-400">Users/you/code/project</span>
-              </code>
-            </div>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">
-              Or <button onClick={() => fileInputRef.current?.click()} className="text-indigo-600 dark:text-indigo-400 hover:underline">open a file</button> to view issues offline
-            </p>
-          </div>
         ) : loading && !isFileMode ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Spinner />
@@ -626,11 +611,11 @@ function App() {
             </button>
           </div>
         ) : viewMode === 'list' ? (
-          <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} seenIds={seenIds} onMarkSeen={markSeen} />
+          <IssueList issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} seenIds={seenIds} onMarkSeen={markSeen} isGlobalMode={isGlobalMode} />
         ) : viewMode === 'outline' ? (
           <IssueOutline issues={issues} onUpdate={send} onIssueClick={setSelectedIssue} />
         ) : (
-          <KanbanBoard issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} />
+          <KanbanBoard issues={issues} onUpdateStatus={send} onIssueClick={setSelectedIssue} isGlobalMode={isGlobalMode} />
         )}
       </main>
 

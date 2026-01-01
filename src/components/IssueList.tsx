@@ -13,6 +13,7 @@ interface IssueListProps {
   onIssueClick?: (issue: Issue) => void
   seenIds?: Set<string>
   onMarkSeen?: (id: string) => void
+  isGlobalMode?: boolean
 }
 
 type SortField = 'priority' | 'created_at' | 'updated_at' | 'closed_at' | 'title' | 'status'
@@ -113,7 +114,7 @@ function getInitialStateFromUrl() {
   }
 }
 
-export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new Set(), onMarkSeen }: IssueListProps) {
+export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new Set(), onMarkSeen, isGlobalMode = false }: IssueListProps) {
   const initial = getInitialStateFromUrl()
   const [sortField, setSortField] = useState<SortField>(initial.sortField)
   const [sortDirection, setSortDirection] = useState<SortDirection>(initial.sortDirection)
@@ -253,6 +254,9 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
   const allLabels = Array.from(new Set(issues.flatMap(i => i.labels || []))).sort()
   const allTypes = Array.from(new Set(issues.map(i => i.issue_type).filter(Boolean))).sort() as string[]
   const allAssignees = Array.from(new Set(issues.map(i => i.assignee).filter(Boolean))).sort() as string[]
+  // allProjects can be used for a project filter dropdown in the future
+  const _allProjects = isGlobalMode ? Array.from(new Set(issues.map(i => i._project).filter(Boolean))).sort() as string[] : []
+  void _allProjects // Unused for now - future: project filter dropdown
 
   // Toggle label selection
   function toggleLabel(label: string) {
@@ -960,7 +964,7 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700" role="grid" aria-label="Issues list">
+        <table className={`divide-y divide-gray-200 dark:divide-slate-700 ${isCompactMode ? 'w-max' : 'min-w-full'}`} role="grid" aria-label="Issues list">
           <thead className="bg-gray-50 dark:bg-slate-800/50">
             <tr>
               <th className="px-4 py-3 w-10">
@@ -975,15 +979,20 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 hidden sm:table-cell">
+              {isGlobalMode && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Project
+                </th>
+              )}
+              <th className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 ${isCompactMode ? '' : 'hidden sm:table-cell'}`}>
                 Type
               </th>
               <SortHeader field="priority">Priority</SortHeader>
               <SortHeader field="title">Title</SortHeader>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+              <th className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${isCompactMode ? '' : 'hidden lg:table-cell'}`}>
                 Labels
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 hidden md:table-cell" title="Dependencies">
+              <th className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16 ${isCompactMode ? '' : 'hidden md:table-cell'}`} title="Dependencies">
                 Deps
               </th>
               <SortHeader field="status">Status</SortHeader>
@@ -1072,6 +1081,18 @@ export function IssueList({ issues, onUpdateStatus, onIssueClick, seenIds = new 
                     </button>
                   </div>
                 </td>
+                {isGlobalMode && (
+                  <td className="px-4 py-3">
+                    <a
+                      href={`/${issue._project}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs font-medium px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                      title={issue._projectPath}
+                    >
+                      {issue._project}
+                    </a>
+                  </td>
+                )}
                 <td className="px-4 py-3 hidden sm:table-cell">
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${TYPE_ICONS[issue.issue_type || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
                     {issue.issue_type || 'task'}

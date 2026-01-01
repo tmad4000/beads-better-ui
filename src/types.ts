@@ -14,6 +14,9 @@ export interface Issue {
   dependent_count?: number
   estimated_minutes?: number  // Time estimate in minutes
   external_ref?: string       // External reference (e.g., 'gh-123', 'jira-ABC')
+  // Global mode fields (added when aggregating across projects)
+  _project?: string           // Project folder name
+  _projectPath?: string       // Full project path
 }
 
 export interface IssueDetail extends Issue {

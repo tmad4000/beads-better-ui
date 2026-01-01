@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Issue, MessageType, ReplyEnvelope } from '../types'
 
+interface Project {
+  path: string
+  name: string
+}
+
 interface UseWebSocketReturn {
   connected: boolean
   loading: boolean
   issues: Issue[]
   projectPath: string | null
   projectName: string | null
+  isGlobalMode: boolean
+  projects: Project[]
   send: (type: MessageType, payload?: unknown) => Promise<unknown>
 }
 
@@ -44,6 +51,8 @@ export function useWebSocket(): UseWebSocketReturn {
   const [issues, setIssues] = useState<Issue[]>([])
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [projectName, setProjectName] = useState<string | null>(null)
+  const [isGlobalMode, setIsGlobalMode] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const pendingRef = useRef<Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>>(new Map())
 
@@ -96,8 +105,14 @@ export function useWebSocket(): UseWebSocketReturn {
             payload: { path: projectPathFromUrl }
           }))
         } else {
-          // No project in URL - just show empty state
-          setLoading(false)
+          // No project in URL - subscribe to global issues
+          setIsGlobalMode(true)
+          setProjectName('All Projects')
+          const subscribeId = nextId()
+          ws.send(JSON.stringify({
+            id: subscribeId,
+            type: 'subscribe-global'
+          }))
         }
       }
 
@@ -129,10 +144,16 @@ export function useWebSocket(): UseWebSocketReturn {
 
           // Handle push events
           if (data.type === 'snapshot') {
-            const payload = data.payload as { items?: Issue[] }
+            const payload = data.payload as { items?: Issue[]; projects?: Project[]; isGlobal?: boolean }
             if (payload?.items) {
               setIssues(payload.items)
               setLoading(false)
+            }
+            if (payload?.projects) {
+              setProjects(payload.projects)
+            }
+            if (payload?.isGlobal) {
+              setIsGlobalMode(true)
             }
           } else if (data.type === 'upsert') {
             const payload = data.payload as { item?: Issue }
@@ -186,5 +207,5 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   }, [])
 
-  return { connected, loading, issues, projectPath, projectName, send }
+  return { connected, loading, issues, projectPath, projectName, isGlobalMode, projects, send }
 }

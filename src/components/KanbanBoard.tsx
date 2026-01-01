@@ -8,6 +8,7 @@ interface KanbanBoardProps {
   issues: Issue[]
   onUpdateStatus: (type: MessageType, payload?: unknown) => Promise<unknown>
   onIssueClick?: (issue: Issue) => void
+  isGlobalMode?: boolean
 }
 
 const STATUSES = [
@@ -34,7 +35,7 @@ const TYPE_COLORS: Record<string, string> = {
   chore: 'text-gray-600 dark:text-gray-400',
 }
 
-export function KanbanBoard({ issues, onUpdateStatus, onIssueClick }: KanbanBoardProps) {
+export function KanbanBoard({ issues, onUpdateStatus, onIssueClick, isGlobalMode = false }: KanbanBoardProps) {
   const [movingIssue, setMovingIssue] = useState<string | null>(null)
 
   // Group issues by status
@@ -101,6 +102,18 @@ export function KanbanBoard({ issues, onUpdateStatus, onIssueClick }: KanbanBoar
                 <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 line-clamp-2">
                   {issue.title || 'Untitled'}
                 </h4>
+
+                {/* Project badge in global mode */}
+                {isGlobalMode && issue._project && (
+                  <a
+                    href={`/${issue._project}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-block mb-2 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                    title={issue._projectPath}
+                  >
+                    {issue._project}
+                  </a>
+                )}
 
                 {/* Footer */}
                 <div className="flex items-center justify-between text-xs">
