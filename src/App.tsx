@@ -19,11 +19,6 @@ interface BeadsInfo {
   issueCount: number
 }
 
-interface ProjectInfo {
-  path: string
-  name: string
-}
-
 function Spinner() {
   return (
     <svg
@@ -131,9 +126,8 @@ function KeyboardShortcutsHelp({ onClose }: { onClose: () => void }) {
 }
 
 function App() {
-  const { connected, loading, issues: wsIssues, send } = useWebSocket()
+  const { connected, loading, issues: wsIssues, projectPath, send } = useWebSocket()
   const [beadsInfo, setBeadsInfo] = useState<BeadsInfo | null>(null)
-  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null)
   const [showNewIssue, setShowNewIssue] = useState(false)
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -200,16 +194,6 @@ function App() {
     URL.revokeObjectURL(url)
   }, [issues])
 
-  // Fetch project info on connect
-  useEffect(() => {
-    if (connected) {
-      send('get-project-info', {}).then((result) => {
-        if (result && typeof result === 'object' && 'path' in result) {
-          setProjectInfo(result as ProjectInfo)
-        }
-      }).catch(() => {})
-    }
-  }, [connected, send])
 
   // Track which closed issues have been "seen" (reviewed)
   // Stored in .beads/seen.json, synced via git
@@ -420,16 +404,16 @@ function App() {
                 </button>
               </span>
             )}
-            {projectInfo && !isFileMode && (
+            {projectPath && !isFileMode && (
               <div className="relative group">
                 <button
                   className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
-                  title={projectInfo.path}
+                  title={projectPath}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
-                  <span className="font-mono truncate max-w-[200px]">{projectInfo.path.replace(/^\/Users\/[^/]+/, '~')}</span>
+                  <span className="font-mono truncate max-w-[200px]">{projectPath.replace(/^\/Users\/[^/]+/, '~')}</span>
                   <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -602,6 +586,27 @@ function App() {
             <Spinner />
             <p className="text-gray-500 dark:text-gray-400">Connecting to server...</p>
             <p className="text-sm text-gray-400 dark:text-gray-500">
+              Or <button onClick={() => fileInputRef.current?.click()} className="text-indigo-600 dark:text-indigo-400 hover:underline">open a file</button> to view issues offline
+            </p>
+          </div>
+        ) : connected && !projectPath && !isFileMode ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <svg className="w-16 h-16 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">No Project Selected</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
+              Open a beads project by adding its name or path to the URL:
+            </p>
+            <div className="flex flex-col gap-2 text-sm font-mono">
+              <code className="px-3 py-2 bg-gray-100 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300">
+                http://localhost:3050/<span className="text-indigo-600 dark:text-indigo-400">project-name</span>
+              </code>
+              <code className="px-3 py-2 bg-gray-100 dark:bg-slate-800 rounded text-gray-700 dark:text-gray-300">
+                http://localhost:3050/<span className="text-indigo-600 dark:text-indigo-400">Users/you/code/project</span>
+              </code>
+            </div>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">
               Or <button onClick={() => fileInputRef.current?.click()} className="text-indigo-600 dark:text-indigo-400 hover:underline">open a file</button> to view issues offline
             </p>
           </div>

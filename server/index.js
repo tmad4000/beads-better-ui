@@ -5,12 +5,19 @@ import { existsSync } from 'node:fs'
 import { join, dirname, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
+import { homedir } from 'node:os'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const PORT = process.env.PORT || 3001
-const SEEN_FILE = join(process.cwd(), '.beads', 'seen.json')
-const PROJECT_PATH = process.cwd()
+const PORT = process.env.PORT || 3050
 const DIST_DIR = join(__dirname, '..', 'dist')
+
+// Directories to search for short project names
+const SEARCH_PATHS = [
+  join(homedir(), 'code'),
+  join(homedir(), 'projects'),
+  join(homedir(), 'Developer'),
+  join(homedir(), 'dev'),
+]
 
 // MIME types for static file serving
 const MIME_TYPES = {
@@ -26,27 +33,64 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2',
 }
 
-// Read seen.json file
-async function readSeenFile() {
+// Resolve a project path from URL
+// - Full paths like /Users/jacob/code/foo -> use directly
+// - Short names like /foo -> search in SEARCH_PATHS
+function resolveProjectPath(urlPath) {
+  // Remove leading slash and any query params
+  let cleanPath = urlPath.replace(/^\//, '').split('?')[0]
+
+  // If empty, no project
+  if (!cleanPath) return null
+
+  // If it looks like a full path (starts with Users, home, etc.)
+  if (cleanPath.startsWith('Users/') || cleanPath.startsWith('home/')) {
+    const fullPath = '/' + cleanPath
+    if (existsSync(join(fullPath, '.beads'))) {
+      return fullPath
+    }
+    return null
+  }
+
+  // Otherwise, treat as a short name and search
+  for (const searchPath of SEARCH_PATHS) {
+    const candidate = join(searchPath, cleanPath)
+    if (existsSync(join(candidate, '.beads'))) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+// Get seen file path for a project
+function getSeenFilePath(projectPath) {
+  return join(projectPath, '.beads', 'seen.json')
+}
+
+// Read seen.json file for a project
+async function readSeenFile(projectPath) {
   try {
-    if (!existsSync(SEEN_FILE)) {
+    const seenFile = getSeenFilePath(projectPath)
+    if (!existsSync(seenFile)) {
       return { seen: [], updated_at: null }
     }
-    const content = await readFile(SEEN_FILE, 'utf-8')
+    const content = await readFile(seenFile, 'utf-8')
     return JSON.parse(content)
   } catch {
     return { seen: [], updated_at: null }
   }
 }
 
-// Write seen.json file
-async function writeSeenFile(data) {
+// Write seen.json file for a project
+async function writeSeenFile(projectPath, data) {
   try {
+    const seenFile = getSeenFilePath(projectPath)
     const content = JSON.stringify({
       seen: data.seen || [],
       updated_at: new Date().toISOString()
     }, null, 2)
-    await writeFile(SEEN_FILE, content, 'utf-8')
+    await writeFile(seenFile, content, 'utf-8')
     return true
   } catch (err) {
     console.error('Error writing seen.json:', err)
@@ -54,10 +98,13 @@ async function writeSeenFile(data) {
   }
 }
 
-// Run bd CLI command
-function runBd(args) {
+// Run bd CLI command in a specific project directory
+function runBd(args, projectPath) {
   return new Promise((resolve) => {
-    const child = spawn('bd', args, { shell: false })
+    const child = spawn('bd', args, {
+      shell: false,
+      cwd: projectPath
+    })
     const stdout = []
     const stderr = []
 
@@ -76,8 +123,8 @@ function runBd(args) {
 }
 
 // Parse JSON from bd output
-async function runBdJson(args) {
-  const result = await runBd(args)
+async function runBdJson(args, projectPath) {
+  const result = await runBd(args, projectPath)
   if (result.code !== 0) {
     return { ok: false, error: result.stderr }
   }
@@ -93,41 +140,44 @@ async function serveStatic(req, res) {
   const url = new URL(req.url, `http://localhost:${PORT}`)
   let filePath = url.pathname
 
-  // Default to index.html for root or paths without extension (SPA routing)
-  if (filePath === '/' || !extname(filePath)) {
-    filePath = '/index.html'
-  }
+  // Check if this is a static asset request
+  const ext = extname(filePath)
+  if (ext && MIME_TYPES[ext]) {
+    // Serve static file from dist
+    const fullPath = join(DIST_DIR, filePath)
 
-  const fullPath = join(DIST_DIR, filePath)
+    // Security: prevent directory traversal
+    if (!fullPath.startsWith(DIST_DIR)) {
+      res.writeHead(403)
+      res.end('Forbidden')
+      return
+    }
 
-  // Security: prevent directory traversal
-  if (!fullPath.startsWith(DIST_DIR)) {
-    res.writeHead(403)
-    res.end('Forbidden')
-    return
-  }
-
-  try {
-    const content = await readFile(fullPath)
-    const ext = extname(filePath)
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream'
-    res.writeHead(200, { 'Content-Type': contentType })
-    res.end(content)
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      // For SPA: serve index.html for any path not found
-      try {
-        const indexContent = await readFile(join(DIST_DIR, 'index.html'))
-        res.writeHead(200, { 'Content-Type': 'text/html' })
-        res.end(indexContent)
-      } catch {
+    try {
+      const content = await readFile(fullPath)
+      res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] })
+      res.end(content)
+      return
+    } catch (err) {
+      if (err.code === 'ENOENT') {
         res.writeHead(404)
         res.end('Not Found')
+        return
       }
-    } else {
       res.writeHead(500)
       res.end('Internal Server Error')
+      return
     }
+  }
+
+  // For all other paths, serve index.html (SPA routing)
+  try {
+    const indexContent = await readFile(join(DIST_DIR, 'index.html'))
+    res.writeHead(200, { 'Content-Type': 'text/html' })
+    res.end(indexContent)
+  } catch {
+    res.writeHead(404)
+    res.end('Not Found - Run npm run build first')
   }
 }
 
@@ -137,27 +187,62 @@ const server = createServer(serveStatic)
 // Create WebSocket server
 const wss = new WebSocketServer({ server })
 
-// Track subscriptions
-const subscriptions = new Map()
+// Track client subscriptions and their project paths
+const clientData = new WeakMap()
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   console.log('Client connected')
-  const clientSubs = new Set()
+
+  // Initialize client data
+  clientData.set(ws, {
+    projectPath: null,
+    subscriptions: new Set()
+  })
 
   ws.on('message', async (data) => {
     try {
       const msg = JSON.parse(data.toString())
       const { id, type, payload } = msg
+      const client = clientData.get(ws)
 
       let response = { id, type, ok: true, payload: null }
+
+      // Handle set-project message to establish project context
+      if (type === 'set-project') {
+        const { path: projectPath } = payload || {}
+        const resolved = resolveProjectPath(projectPath)
+        if (resolved) {
+          client.projectPath = resolved
+          response.payload = {
+            path: resolved,
+            name: resolved.split('/').pop()
+          }
+        } else {
+          response.ok = false
+          response.error = { code: 'INVALID_PROJECT', message: `Not a beads project: ${projectPath}` }
+        }
+        ws.send(JSON.stringify(response))
+        return
+      }
+
+      // All other commands require a project path
+      // Can come from payload.path or from previously set project
+      let projectPath = payload?.path ? resolveProjectPath(payload.path) : client.projectPath
+
+      if (!projectPath) {
+        response.ok = false
+        response.error = { code: 'NO_PROJECT', message: 'No project path set. Send set-project first or include path in payload.' }
+        ws.send(JSON.stringify(response))
+        return
+      }
 
       switch (type) {
         case 'subscribe-list': {
           const listType = payload?.list || 'all-issues'
-          clientSubs.add(listType)
+          client.subscriptions.add(listType)
 
           // Fetch initial data
-          const result = await runBdJson(['list', '--json'])
+          const result = await runBdJson(['list', '--json'], projectPath)
           if (result.ok) {
             response.type = 'snapshot'
             response.payload = { id: listType, type: 'snapshot', items: result.data }
@@ -175,25 +260,25 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or status' }
             break
           }
-          const result = await runBd(['update', issueId, '--status', status])
+          const result = await runBd(['update', issueId, '--status', status], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            // Broadcast update to all clients
-            broadcastRefresh()
+            // Broadcast update to all clients watching this project
+            broadcastRefresh(projectPath)
           }
           break
         }
 
         case 'update-priority': {
           const { id: issueId, priority } = payload || {}
-          const result = await runBd(['update', issueId, '--priority', String(priority)])
+          const result = await runBd(['update', issueId, '--priority', String(priority)], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
@@ -205,29 +290,29 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or title' }
             break
           }
-          const result = await runBd(['update', issueId, '--title', title])
+          const result = await runBd(['update', issueId, '--title', title], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
 
         case 'update-type': {
-          const { id: issueId, type } = payload || {}
-          if (!issueId || !type) {
+          const { id: issueId, type: issueType } = payload || {}
+          if (!issueId || !issueType) {
             response.ok = false
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or type' }
             break
           }
-          const result = await runBd(['update', issueId, '--type', type])
+          const result = await runBd(['update', issueId, '--type', issueType], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
@@ -239,13 +324,12 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          // Use 0 to clear the estimate
-          const result = await runBd(['update', issueId, '--estimate', String(estimate || 0)])
+          const result = await runBd(['update', issueId, '--estimate', String(estimate || 0)], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
@@ -257,48 +341,48 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          const result = await runBd(['update', issueId, '--external-ref', externalRef || ''])
+          const result = await runBd(['update', issueId, '--external-ref', externalRef || ''], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'UPDATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
 
         case 'create-issue': {
-          const { title, description, type, priority, labels, parentId } = payload || {}
+          const { title, description, type: issueType, priority, labels, parentId } = payload || {}
           if (!title) {
             response.ok = false
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing title' }
             break
           }
           const args = ['create', title]
-          if (type) args.push('--type', type)
+          if (issueType) args.push('--type', issueType)
           if (priority !== undefined) args.push('--priority', String(priority))
           if (description) args.push('--description', description)
           if (labels && labels.length > 0) args.push('--labels', labels.join(','))
           if (parentId) args.push('--parent', parentId)
 
-          const result = await runBd(args)
+          const result = await runBd(args, projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'CREATE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
 
         case 'label-add': {
           const { id: issueId, label } = payload || {}
-          const result = await runBd(['label', 'add', issueId, label])
+          const result = await runBd(['label', 'add', issueId, label], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'LABEL_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
@@ -310,24 +394,24 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          const result = await runBd(['delete', issueId, '--force'])
+          const result = await runBd(['delete', issueId, '--force'], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'DELETE_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
 
         case 'label-remove': {
           const { id: issueId, label } = payload || {}
-          const result = await runBd(['label', 'remove', issueId, label])
+          const result = await runBd(['label', 'remove', issueId, label], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'LABEL_ERROR', message: result.stderr }
           } else {
-            broadcastRefresh()
+            broadcastRefresh(projectPath)
           }
           break
         }
@@ -339,12 +423,11 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          const result = await runBdJson(['show', issueId, '--json'])
+          const result = await runBdJson(['show', issueId, '--json'], projectPath)
           if (!result.ok) {
             response.ok = false
             response.error = { code: 'SHOW_ERROR', message: result.error }
           } else {
-            // bd show returns an array, extract the first item
             response.payload = Array.isArray(result.data) ? result.data[0] : result.data
           }
           break
@@ -357,15 +440,13 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id or content' }
             break
           }
-          const result = await runBd(['comments', 'add', issueId, content])
+          const result = await runBd(['comments', 'add', issueId, content], projectPath)
           if (result.code !== 0) {
             response.ok = false
             response.error = { code: 'COMMENT_ERROR', message: result.stderr }
           } else {
-            // Return updated issue details
-            const showResult = await runBdJson(['show', issueId, '--json'])
+            const showResult = await runBdJson(['show', issueId, '--json'], projectPath)
             if (showResult.ok) {
-              // bd show returns an array, extract the first item
               response.payload = Array.isArray(showResult.data) ? showResult.data[0] : showResult.data
             }
           }
@@ -373,7 +454,7 @@ wss.on('connection', (ws) => {
         }
 
         case 'get-seen': {
-          const seenData = await readSeenFile()
+          const seenData = await readSeenFile(projectPath)
           response.payload = seenData
           break
         }
@@ -385,10 +466,10 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          const seenData = await readSeenFile()
+          const seenData = await readSeenFile(projectPath)
           if (!seenData.seen.includes(issueId)) {
             seenData.seen.push(issueId)
-            await writeSeenFile(seenData)
+            await writeSeenFile(projectPath, seenData)
           }
           response.payload = seenData
           break
@@ -401,24 +482,23 @@ wss.on('connection', (ws) => {
             response.error = { code: 'INVALID_PAYLOAD', message: 'Missing id' }
             break
           }
-          const seenData = await readSeenFile()
+          const seenData = await readSeenFile(projectPath)
           seenData.seen = seenData.seen.filter(id => id !== issueId)
-          await writeSeenFile(seenData)
+          await writeSeenFile(projectPath, seenData)
           response.payload = seenData
           break
         }
 
         case 'get-project-info': {
           response.payload = {
-            path: PROJECT_PATH,
-            name: PROJECT_PATH.split('/').pop()
+            path: projectPath,
+            name: projectPath.split('/').pop()
           }
           break
         }
 
         case 'open-in-finder': {
-          const { spawn: spawnSync } = await import('node:child_process')
-          spawnSync('open', [PROJECT_PATH], { detached: true })
+          spawn('open', [projectPath], { detached: true })
           response.payload = { opened: true }
           break
         }
@@ -436,13 +516,13 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Client disconnected')
-    clientSubs.clear()
+    clientData.delete(ws)
   })
 })
 
-// Broadcast refresh to all clients
-async function broadcastRefresh() {
-  const result = await runBdJson(['list', '--json'])
+// Broadcast refresh to all clients watching a specific project
+async function broadcastRefresh(projectPath) {
+  const result = await runBdJson(['list', '--json'], projectPath)
   if (!result.ok) return
 
   const msg = JSON.stringify({
@@ -454,11 +534,16 @@ async function broadcastRefresh() {
 
   wss.clients.forEach((client) => {
     if (client.readyState === 1) { // OPEN
-      client.send(msg)
+      const data = clientData.get(client)
+      // Only send to clients watching this project
+      if (data && data.projectPath === projectPath) {
+        client.send(msg)
+      }
     }
   })
 }
 
 server.listen(PORT, () => {
   console.log(`Beads Better UI server listening on http://localhost:${PORT}`)
+  console.log(`Open a project: http://localhost:${PORT}/<project-name>`)
 })

@@ -5,6 +5,8 @@ interface UseWebSocketReturn {
   connected: boolean
   loading: boolean
   issues: Issue[]
+  projectPath: string | null
+  projectName: string | null
   send: (type: MessageType, payload?: unknown) => Promise<unknown>
 }
 
@@ -27,10 +29,21 @@ function nextId(): string {
   return `${now}-${rand}`
 }
 
+// Get project path from URL pathname
+function getProjectPathFromUrl(): string | null {
+  const pathname = window.location.pathname
+  // Remove leading slash, ignore if empty or just '/'
+  const path = pathname.replace(/^\//, '')
+  if (!path || path === '') return null
+  return path
+}
+
 export function useWebSocket(): UseWebSocketReturn {
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [issues, setIssues] = useState<Issue[]>([])
+  const [projectPath, setProjectPath] = useState<string | null>(null)
+  const [projectName, setProjectName] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const pendingRef = useRef<Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>>(new Map())
 
@@ -47,25 +60,51 @@ export function useWebSocket(): UseWebSocketReturn {
   }, [])
 
   useEffect(() => {
-    function connectWithUrl(wsUrl: string) {
+    function connectWithUrl(wsUrl: string, projectPathFromUrl: string | null) {
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
 
       ws.onopen = () => {
         setConnected(true)
-        // Subscribe to all issues
-        const id = nextId()
-        ws.send(JSON.stringify({
-          id,
-          type: 'subscribe-list',
-          payload: { list: 'all-issues' }
-        }))
+
+        // If we have a project path from URL, set it first
+        if (projectPathFromUrl) {
+          const setProjectId = nextId()
+          pendingRef.current.set(setProjectId, {
+            resolve: (payload: unknown) => {
+              const result = payload as { path: string; name: string } | undefined
+              if (result) {
+                setProjectPath(result.path)
+                setProjectName(result.name)
+              }
+              // Then subscribe to issues
+              const subscribeId = nextId()
+              ws.send(JSON.stringify({
+                id: subscribeId,
+                type: 'subscribe-list',
+                payload: { list: 'all-issues' }
+              }))
+            },
+            reject: (err: Error) => {
+              console.error('Failed to set project:', err)
+              setLoading(false)
+            }
+          })
+          ws.send(JSON.stringify({
+            id: setProjectId,
+            type: 'set-project',
+            payload: { path: projectPathFromUrl }
+          }))
+        } else {
+          // No project in URL - just show empty state
+          setLoading(false)
+        }
       }
 
       ws.onclose = () => {
         setConnected(false)
         // Reconnect after delay
-        setTimeout(() => connectWithUrl(wsUrl), 2000)
+        setTimeout(() => connectWithUrl(wsUrl, projectPathFromUrl), 2000)
       }
 
       ws.onerror = () => {
@@ -120,18 +159,26 @@ export function useWebSocket(): UseWebSocketReturn {
       }
     }
 
+    // Get project path from URL
+    const projectPathFromUrl = getProjectPathFromUrl()
+
     // Check if we're in Electron
     if (window.beadsAPI) {
-      // Wait for config from main process
+      // In Electron, use config from main process
       window.beadsAPI.onConfigReady((config) => {
         const wsUrl = `ws://localhost:${config.port}/ws`
-        connectWithUrl(wsUrl)
+        // In Electron, project path comes from the config, not URL
+        setProjectPath(config.projectPath)
+        setProjectName(config.projectPath.split('/').pop() || null)
+        connectWithUrl(wsUrl, config.projectPath)
       })
     } else {
-      // Running in browser - use Vite proxy
+      // Running in browser - connect to server on port 3050
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsUrl = `${protocol}//${window.location.host}/ws`
-      connectWithUrl(wsUrl)
+      const host = window.location.hostname
+      const port = window.location.port || '3050'
+      const wsUrl = `${protocol}//${host}:${port}/ws`
+      connectWithUrl(wsUrl, projectPathFromUrl)
     }
 
     return () => {
@@ -139,5 +186,5 @@ export function useWebSocket(): UseWebSocketReturn {
     }
   }, [])
 
-  return { connected, loading, issues, send }
+  return { connected, loading, issues, projectPath, projectName, send }
 }
